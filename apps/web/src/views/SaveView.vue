@@ -1,128 +1,96 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { database } from '@/database/database'
-import { createDevelopmentComicFixture } from '@/database/developmentComicFixture'
-import {
-  createComicRegistrationService,
-  createRegistrationId,
-} from '@/database/registrationService'
-import { createMangaRepository } from '@/database/repository'
-import type { Series } from '@/domain/models'
+import { ref } from 'vue'
+import { useExistingSeriesEpisodeRegistration } from '@/composables/useExistingSeriesEpisodeRegistration'
+import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration'
+import { usePageUrlValidation } from '@/composables/usePageUrlValidation'
+import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpisodeRegistration'
 import { registrationModeOptions, type RegistrationMode } from './saveRegistrationMode'
-import {
-  submitExistingSeriesEpisodeRegistration,
-  type ExistingSeriesEpisodeRegistrationSubmission,
-} from './saveExistingSeriesEpisodeRegistration'
-import {
-  submitNewSeriesRegistration,
-  type NewSeriesRegistrationSubmission,
-} from './saveNewSeriesRegistration'
-import {
-  submitStandaloneEpisodeRegistration,
-  type StandaloneEpisodeRegistrationSubmission,
-} from './saveStandaloneEpisodeRegistration'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
-const registrationService = createComicRegistrationService(database)
-const repository = createMangaRepository(database)
-const newSeriesTitle = ref('')
-const newSeriesEpisodeTitle = ref('')
-const newSeriesSourcePageUrl = ref('')
-const newSeriesSubmission = ref<NewSeriesRegistrationSubmission>()
-const isSubmittingNewSeries = ref(false)
-const standaloneEpisodeTitle = ref('')
-const standaloneEpisodeSourcePageUrl = ref('')
-const standaloneEpisodeSubmission = ref<StandaloneEpisodeRegistrationSubmission>()
-const isSubmittingStandaloneEpisode = ref(false)
-const seriesOptions = ref<Series[]>([])
-const existingSeriesId = ref('')
-const existingSeriesEpisodeTitle = ref('')
-const existingSeriesEpisodeSourcePageUrl = ref('')
-const existingSeriesEpisodeSubmission = ref<ExistingSeriesEpisodeRegistrationSubmission>()
-const isSubmittingExistingSeriesEpisode = ref(false)
+const {
+  pageUrl,
+  validatedPageUrl,
+  pageUrlSubmission,
+  isValidatingPageUrl,
+  validatePageUrlForAnalysis,
+} = usePageUrlValidation()
+const {
+  newSeriesTitle,
+  newSeriesEpisodeTitle,
+  newSeriesSourcePageUrl,
+  newSeriesSubmission,
+  isSubmittingNewSeries,
+  registerNewSeries,
+  clearNewSeriesSubmission,
+} = useNewSeriesRegistration()
+const {
+  standaloneEpisodeTitle,
+  standaloneEpisodeSourcePageUrl,
+  standaloneEpisodeSubmission,
+  isSubmittingStandaloneEpisode,
+  registerStandaloneEpisode,
+  clearStandaloneEpisodeSubmission,
+} = useStandaloneEpisodeRegistration()
+const {
+  seriesOptions,
+  existingSeriesId,
+  existingSeriesEpisodeTitle,
+  existingSeriesEpisodeSourcePageUrl,
+  existingSeriesEpisodeSubmission,
+  isSubmittingExistingSeriesEpisode,
+  loadSeriesOptions,
+  registerExistingSeriesEpisode,
+  clearExistingSeriesEpisodeSubmission,
+} = useExistingSeriesEpisodeRegistration()
 
 function selectRegistrationMode(mode: RegistrationMode) {
   registrationMode.value = mode
-  newSeriesSubmission.value = undefined
-  standaloneEpisodeSubmission.value = undefined
-  existingSeriesEpisodeSubmission.value = undefined
+  clearNewSeriesSubmission()
+  clearStandaloneEpisodeSubmission()
+  clearExistingSeriesEpisodeSubmission()
 
   if (mode === 'existingSeries') {
     void loadSeriesOptions()
   }
 }
-
-async function loadSeriesOptions() {
-  seriesOptions.value = await repository.series.findAll()
-}
-
-function createFixedImageForRegistration() {
-  const image = createDevelopmentComicFixture().image
-
-  return { ...image, id: createRegistrationId() }
-}
-
-async function registerNewSeries() {
-  isSubmittingNewSeries.value = true
-
-  try {
-    newSeriesSubmission.value = await submitNewSeriesRegistration(
-      registrationService,
-      {
-        seriesTitle: newSeriesTitle.value,
-        title: newSeriesEpisodeTitle.value,
-        sourcePageUrl: newSeriesSourcePageUrl.value,
-      },
-      createFixedImageForRegistration(),
-    )
-  } finally {
-    isSubmittingNewSeries.value = false
-  }
-}
-
-async function registerStandaloneEpisode() {
-  isSubmittingStandaloneEpisode.value = true
-
-  try {
-    standaloneEpisodeSubmission.value = await submitStandaloneEpisodeRegistration(
-      registrationService,
-      {
-        title: standaloneEpisodeTitle.value,
-        sourcePageUrl: standaloneEpisodeSourcePageUrl.value,
-      },
-      createFixedImageForRegistration(),
-    )
-  } finally {
-    isSubmittingStandaloneEpisode.value = false
-  }
-}
-
-async function registerExistingSeriesEpisode() {
-  isSubmittingExistingSeriesEpisode.value = true
-
-  try {
-    existingSeriesEpisodeSubmission.value = await submitExistingSeriesEpisodeRegistration(
-      registrationService,
-      {
-        seriesId: existingSeriesId.value,
-        title: existingSeriesEpisodeTitle.value,
-        sourcePageUrl: existingSeriesEpisodeSourcePageUrl.value,
-      },
-      createFixedImageForRegistration(),
-    )
-  } finally {
-    isSubmittingExistingSeriesEpisode.value = false
-  }
-}
-
-onMounted(() => {
-  void loadSeriesOptions()
-})
 </script>
 
 <template>
   <main class="save-view">
     <h1>URL入力・保存</h1>
+
+    <form
+      class="page-url-form"
+      aria-label="取得元ページURL"
+      @submit.prevent="validatePageUrlForAnalysis"
+    >
+      <label class="registration-fields__label">
+        <span>取得元ページURL</span>
+        <input
+          v-model="pageUrl"
+          name="pageUrl"
+          type="text"
+          inputmode="url"
+          autocomplete="url"
+          placeholder="https://example.com/comic/1"
+          :aria-invalid="pageUrlSubmission?.status === 'error'"
+          :aria-describedby="pageUrlSubmission ? 'page-url-message' : undefined"
+        />
+      </label>
+      <button class="registration-submit" :disabled="isValidatingPageUrl" type="submit">
+        {{ isValidatingPageUrl ? '確認中…' : 'URLを確認' }}
+      </button>
+      <p
+        v-if="pageUrlSubmission"
+        id="page-url-message"
+        class="registration-message"
+        :class="`registration-message--${pageUrlSubmission.status}`"
+        :role="pageUrlSubmission.status === 'error' ? 'alert' : 'status'"
+      >
+        {{ pageUrlSubmission.message }}
+      </p>
+      <p v-if="validatedPageUrl" class="validated-url">{{ validatedPageUrl }}</p>
+    </form>
 
     <p class="save-view__description">保存する話の登録方法を選択してください。</p>
 
@@ -293,6 +261,14 @@ h1 {
   gap: 0.25rem;
 }
 
+.page-url-form {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 0.5rem;
+}
+
 .registration-fields__label {
   display: grid;
   gap: 0.375rem;
@@ -310,6 +286,20 @@ h1 {
   background: rgb(var(--v-theme-surface));
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 0.25rem;
+}
+
+.page-url-form input {
+  min-height: 3rem;
+  padding: 0 0.75rem;
+  color: rgb(var(--v-theme-on-surface));
+  font: inherit;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 0.25rem;
+}
+
+.page-url-form input[aria-invalid='true'] {
+  border-color: #b91c1c;
 }
 
 .registration-fields__label input:focus-visible,
@@ -347,5 +337,11 @@ h1 {
 .registration-message--error {
   color: #7f1d1d;
   background: #fee2e2;
+}
+
+.validated-url {
+  overflow-wrap: anywhere;
+  color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.8125rem;
 }
 </style>
