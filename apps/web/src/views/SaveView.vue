@@ -1,13 +1,55 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { database } from '@/database/database'
+import { createDevelopmentComicFixture } from '@/database/developmentComicFixture'
+import { createComicRegistrationService } from '@/database/registrationService'
 import {
   getRegistrationFields,
   registrationModeOptions,
   type RegistrationMode,
 } from './saveRegistrationMode'
+import {
+  submitNewSeriesRegistration,
+  type NewSeriesRegistrationSubmission,
+} from './saveNewSeriesRegistration'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
 const registrationFields = computed(() => getRegistrationFields(registrationMode.value))
+const registrationService = createComicRegistrationService(database)
+const newSeriesTitle = ref('')
+const newSeriesEpisodeTitle = ref('')
+const newSeriesSourcePageUrl = ref('')
+const newSeriesSubmission = ref<NewSeriesRegistrationSubmission>()
+const isSubmittingNewSeries = ref(false)
+
+function selectRegistrationMode(mode: RegistrationMode) {
+  registrationMode.value = mode
+  newSeriesSubmission.value = undefined
+}
+
+function createFixedImageForRegistration() {
+  const image = createDevelopmentComicFixture().image
+
+  return { ...image, id: crypto.randomUUID() }
+}
+
+async function registerNewSeries() {
+  isSubmittingNewSeries.value = true
+
+  try {
+    newSeriesSubmission.value = await submitNewSeriesRegistration(
+      registrationService,
+      {
+        seriesTitle: newSeriesTitle.value,
+        title: newSeriesEpisodeTitle.value,
+        sourcePageUrl: newSeriesSourcePageUrl.value,
+      },
+      createFixedImageForRegistration(),
+    )
+  } finally {
+    isSubmittingNewSeries.value = false
+  }
+}
 </script>
 
 <template>
@@ -24,13 +66,44 @@ const registrationFields = computed(() => getRegistrationFields(registrationMode
         :class="{ 'registration-mode__button--selected': registrationMode === option.value }"
         type="button"
         :aria-pressed="registrationMode === option.value"
-        @click="registrationMode = option.value"
+        @click="selectRegistrationMode(option.value)"
       >
         {{ option.label }}
       </button>
     </div>
 
-    <section class="registration-fields" :aria-label="`${registrationMode}の入力項目`">
+    <form
+      v-if="registrationMode === 'newSeries'"
+      class="registration-fields"
+      aria-label="新規作品の入力項目"
+      @submit.prevent="registerNewSeries"
+    >
+      <label class="registration-fields__label">
+        <span>作品名</span>
+        <input v-model="newSeriesTitle" name="seriesTitle" type="text" />
+      </label>
+      <label class="registration-fields__label">
+        <span>話タイトル</span>
+        <input v-model="newSeriesEpisodeTitle" name="title" type="text" />
+      </label>
+      <label class="registration-fields__label">
+        <span>元ページURL</span>
+        <input v-model="newSeriesSourcePageUrl" name="sourcePageUrl" type="url" />
+      </label>
+      <button class="registration-submit" :disabled="isSubmittingNewSeries" type="submit">
+        {{ isSubmittingNewSeries ? '登録中…' : '新規作品を登録' }}
+      </button>
+      <p
+        v-if="newSeriesSubmission"
+        class="registration-message"
+        :class="`registration-message--${newSeriesSubmission.status}`"
+        role="status"
+      >
+        {{ newSeriesSubmission.message }}
+      </p>
+    </form>
+
+    <section v-else class="registration-fields" :aria-label="`${registrationMode}の入力項目`">
       <label
         v-for="field in registrationFields"
         :key="field.name"
@@ -118,5 +191,35 @@ h1 {
   border-color: rgb(var(--v-theme-primary));
   outline: 0.125rem solid rgb(var(--v-theme-primary));
   outline-offset: -0.125rem;
+}
+
+.registration-submit {
+  min-height: 3rem;
+  color: rgb(var(--v-theme-on-primary));
+  font: inherit;
+  font-weight: 700;
+  background: rgb(var(--v-theme-primary));
+  border: 0;
+  border-radius: 0.5rem;
+}
+
+.registration-submit:disabled {
+  opacity: 0.6;
+}
+
+.registration-message {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.registration-message--success {
+  color: rgb(var(--v-theme-on-primary));
+  background: rgb(var(--v-theme-primary));
+}
+
+.registration-message--error {
+  color: #7f1d1d;
+  background: #fee2e2;
 }
 </style>
