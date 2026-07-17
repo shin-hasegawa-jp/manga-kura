@@ -19,7 +19,7 @@ afterEach(async () => {
 })
 
 describe('MangaKuraDatabase', () => {
-  it('uses the configured name and schema version', () => {
+  it('設定済みのデータベース名とスキーマバージョンを使用する', () => {
     const database = new MangaKuraDatabase()
 
     expect(database.name).toBe(DATABASE_NAME)
@@ -28,7 +28,7 @@ describe('MangaKuraDatabase', () => {
     database.close()
   })
 
-  it('defines the required stores, primary keys, and indexes', async () => {
+  it('必要なストア、主キー、インデックスを定義する', async () => {
     const database = createTestDatabase()
     await database.open()
 
@@ -48,7 +48,7 @@ describe('MangaKuraDatabase', () => {
     )
   })
 
-  it('does not save data that fails runtime validation', async () => {
+  it('実行時バリデーションに失敗したデータを保存しない', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)
 
@@ -56,7 +56,7 @@ describe('MangaKuraDatabase', () => {
     expect(await database.series.count()).toBe(0)
   })
 
-  it('saves and reads the development series and episode fixture without duplication', async () => {
+  it('開発用の作品と話のFixtureを重複させずに保存・読込する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)
     const fixture = createDevelopmentComicFixture()
@@ -82,7 +82,7 @@ describe('MangaKuraDatabase', () => {
     )
   })
 
-  it('saves and reads development image blobs in display order', async () => {
+  it('開発用画像のBlobを表示順に保存・読込する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)
     const fixture = createDevelopmentComicFixture()

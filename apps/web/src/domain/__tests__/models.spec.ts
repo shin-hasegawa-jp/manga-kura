@@ -3,8 +3,8 @@ import { validateAppSettings, validateComicImage, validateEpisode, validateSerie
 
 const now = new Date('2026-07-17T00:00:00.000Z')
 
-describe('domain model validation', () => {
-  it('validates a series and rejects a missing required title', () => {
+describe('ドメインモデルのバリデーション', () => {
+  it('作品を検証し、必須のタイトルがないデータを拒否する', () => {
     const series = {
       id: 'series-1',
       title: '作品1',
@@ -17,7 +17,7 @@ describe('domain model validation', () => {
     expect(() => validateSeries({ ...series, title: undefined })).toThrow()
   })
 
-  it('validates an episode and rejects an invalid source URL', () => {
+  it('話を検証し、不正な元ページURLを拒否する', () => {
     const episode = {
       id: 'episode-1',
       title: '第1話',
@@ -32,7 +32,7 @@ describe('domain model validation', () => {
     expect(() => validateEpisode({ ...episode, sourcePageUrl: 'not-a-url' })).toThrow()
   })
 
-  it('validates an image and rejects missing binary data', () => {
+  it('画像を検証し、バイナリデータがない場合を拒否する', () => {
     const image = {
       id: 'image-1',
       episodeId: 'episode-1',
@@ -50,7 +50,7 @@ describe('domain model validation', () => {
     expect(() => validateComicImage({ ...image, blob: undefined })).toThrow()
   })
 
-  it('validates app settings and rejects a missing schema version', () => {
+  it('アプリ設定を検証し、スキーマバージョンがない場合を拒否する', () => {
     const settings = {
       id: 'app',
       sortOrder: 'recentlyAdded',

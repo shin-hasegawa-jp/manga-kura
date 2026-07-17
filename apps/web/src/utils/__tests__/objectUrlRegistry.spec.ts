@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createObjectUrlRegistry } from '../objectUrlRegistry'
 
-describe('createObjectUrlRegistry', () => {
-  it('revokes every object URL it creates and does not revoke them twice', () => {
+describe('Object URLレジストリ', () => {
+  it('生成したすべてのObject URLを解放し、同じURLを二重に解放しない', () => {
     const api = {
       createObjectURL: vi.fn().mockReturnValueOnce('blob:first').mockReturnValueOnce('blob:second'),
       revokeObjectURL: vi.fn(),
