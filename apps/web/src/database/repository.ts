@@ -15,6 +15,7 @@ export interface MangaRepository {
   settings: EntityRepository
   library: LibraryRepository
   topLevelLibrary: TopLevelLibraryRepository
+  seriesDetails: SeriesDetailsRepository
 }
 
 export interface EntityRepository<T extends { id: string } = { id: string }> {
@@ -58,6 +59,20 @@ export interface StandaloneEpisodeLibraryEntry {
 
 export interface TopLevelLibraryRepository {
   findAll(): Promise<TopLevelLibraryEntry[]>
+}
+
+export interface SeriesEpisodeEntry {
+  episode: Episode
+  thumbnailImage?: ComicImage
+}
+
+export interface SeriesDetails {
+  series: Series
+  episodes: SeriesEpisodeEntry[]
+}
+
+export interface SeriesDetailsRepository {
+  findBySeriesId(seriesId: string): Promise<SeriesDetails | undefined>
 }
 
 function createEntityRepository<T extends { id: string }>(
@@ -215,6 +230,36 @@ function createTopLevelLibraryRepository(database: MangaKuraDatabase): TopLevelL
   }
 }
 
+function createSeriesDetailsRepository(database: MangaKuraDatabase): SeriesDetailsRepository {
+  return {
+    async findBySeriesId(seriesId) {
+      const series = await database.series.get(seriesId)
+
+      if (series === undefined) {
+        return undefined
+      }
+
+      const [episodes, images] = await Promise.all([
+        database.episodes.where('seriesId').equals(seriesId).toArray(),
+        database.images.toArray(),
+      ])
+      const firstImageByEpisodeId = findFirstImagesByEpisodeId(images)
+      const episodeEntries = [...episodes]
+        .sort(compareEpisodesForSeriesThumbnail)
+        .map((episode): SeriesEpisodeEntry => {
+          const thumbnailImage = firstImageByEpisodeId.get(episode.id)
+
+          return {
+            episode,
+            ...(thumbnailImage ? { thumbnailImage } : {}),
+          }
+        })
+
+      return { series, episodes: episodeEntries }
+    },
+  }
+}
+
 export function createMangaRepository(database: MangaKuraDatabase): MangaRepository {
   return {
     series: createEntityRepository<Series>(database.series, validateSeries),
@@ -223,5 +268,6 @@ export function createMangaRepository(database: MangaKuraDatabase): MangaReposit
     settings: createEntityRepository<AppSettings>(database.settings, validateAppSettings),
     library: createLibraryRepository(database),
     topLevelLibrary: createTopLevelLibraryRepository(database),
+    seriesDetails: createSeriesDetailsRepository(database),
   }
 }
