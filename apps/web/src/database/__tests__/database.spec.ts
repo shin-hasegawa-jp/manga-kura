@@ -198,6 +198,40 @@ describe('MangaKuraDatabase', () => {
     expect(await database.images.count()).toBe(0)
   })
 
+  it('単独の話と固定画像を保存し、作品一覧を経由せずに読込できる', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const registeredAt = new Date('2026-07-17T02:00:00.000Z')
+    const service = createComicRegistrationService(database, {
+      createId: () => 'standalone-episode-1',
+      now: () => registeredAt,
+    })
+
+    const registered = await service.registerStandaloneEpisode({
+      registration: {
+        title: '単独の話',
+        sourcePageUrl: 'https://example.com/standalone-episodes/1',
+      },
+      image: fixture.image,
+    })
+
+    expect(await database.series.count()).toBe(0)
+    expect(registered.episode).toEqual({
+      id: 'standalone-episode-1',
+      title: '単独の話',
+      sourcePageUrl: 'https://example.com/standalone-episodes/1',
+      createdAt: registeredAt,
+      updatedAt: registeredAt,
+      scrollPosition: 0,
+      scrollProgress: 0,
+    })
+    expect(await repository.episodes.findById(registered.episode.id)).toEqual(registered.episode)
+    expect(await repository.images.findByEpisodeId(registered.episode.id)).toEqual([
+      registered.image,
+    ])
+  })
+
   it('開発用画像のBlobを表示順に保存・読込する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)

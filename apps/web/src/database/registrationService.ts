@@ -1,7 +1,9 @@
 import type { ComicImage, Episode, Series } from '@/domain/models'
 import {
   type CreateSeriesRegistration,
+  type CreateStandaloneEpisodeRegistration,
   validateCreateSeriesRegistration,
+  validateCreateStandaloneEpisodeRegistration,
 } from '@/domain/registration'
 import type { MangaKuraDatabase } from './database'
 import { createMangaRepository } from './repository'
@@ -16,8 +18,18 @@ export interface RegisterSeriesWithFirstEpisodeInput {
   image: RegistrationImage
 }
 
+export interface RegisterStandaloneEpisodeInput {
+  registration: CreateStandaloneEpisodeRegistration
+  image: RegistrationImage
+}
+
 export interface RegisteredSeriesWithFirstEpisode {
   series: Series
+  episode: Episode
+  image: ComicImage
+}
+
+export interface RegisteredStandaloneEpisode {
   episode: Episode
   image: ComicImage
 }
@@ -31,6 +43,9 @@ export interface ComicRegistrationService {
   registerSeriesWithFirstEpisode(
     input: RegisterSeriesWithFirstEpisodeInput,
   ): Promise<RegisteredSeriesWithFirstEpisode>
+  registerStandaloneEpisode(
+    input: RegisterStandaloneEpisodeInput,
+  ): Promise<RegisteredStandaloneEpisode>
 }
 
 export function createComicRegistrationService(
@@ -81,6 +96,31 @@ export function createComicRegistrationService(
       )
 
       return { series, episode, image }
+    },
+    async registerStandaloneEpisode(input) {
+      const registration = validateCreateStandaloneEpisodeRegistration(input.registration)
+      const registeredAt = now()
+      const episode: Episode = {
+        id: createId(),
+        title: registration.title,
+        sourcePageUrl: registration.sourcePageUrl,
+        createdAt: registeredAt,
+        updatedAt: registeredAt,
+        scrollPosition: 0,
+        scrollProgress: 0,
+      }
+      const image: ComicImage = {
+        ...input.image,
+        episodeId: episode.id,
+        createdAt: registeredAt,
+      }
+
+      await database.transaction('rw', database.episodes, database.images, async () => {
+        await repository.episodes.save(episode)
+        await repository.images.save(image)
+      })
+
+      return { episode, image }
     },
   }
 }
