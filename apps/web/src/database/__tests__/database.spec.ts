@@ -115,6 +115,32 @@ describe('MangaKuraDatabase', () => {
     ).toBeUndefined()
   })
 
+  it('作品に属する話と単独の話を共通のライブラリ一覧モデルとして読込する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const standaloneEpisode = {
+      id: 'standalone-episode-1',
+      title: '単独の話',
+      sourcePageUrl: 'https://example.com/standalone-episodes/1',
+      createdAt: fixture.episode.createdAt,
+      updatedAt: fixture.episode.updatedAt,
+      scrollPosition: 0,
+      scrollProgress: 0,
+    }
+
+    expect(await repository.library.findAll()).toEqual([])
+
+    await repository.series.save(fixture.series)
+    await repository.episodes.save(fixture.episode)
+    await repository.episodes.save(standaloneEpisode)
+
+    expect(await repository.library.findAll()).toEqual([
+      { episode: fixture.episode, series: fixture.series },
+      { episode: standaloneEpisode },
+    ])
+  })
+
   it('新規作品と最初の話と固定画像を同じトランザクションで保存する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)
