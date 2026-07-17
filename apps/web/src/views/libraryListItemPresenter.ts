@@ -1,4 +1,4 @@
-import type { LibraryEntry } from '@/database/repository'
+import type { TopLevelLibraryEntry } from '@/database/repository'
 import type { ObjectUrlRegistry } from '@/utils/objectUrlRegistry'
 import { getLibraryEntryText, type LibraryEntryText } from './libraryEntryText'
 
@@ -7,7 +7,7 @@ export interface LibraryListItem extends LibraryEntryText {
 }
 
 export interface LibraryListItemPresenter {
-  present(entries: readonly LibraryEntry[]): LibraryListItem[]
+  present(entries: readonly TopLevelLibraryEntry[]): LibraryListItem[]
   dispose(): void
 }
 

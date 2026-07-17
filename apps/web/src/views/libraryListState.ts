@@ -1,12 +1,12 @@
-import type { LibraryEntry } from '@/database/repository'
+import type { TopLevelLibraryEntry } from '@/database/repository'
 
 export type LibraryListState =
   | { kind: 'loading' }
   | { kind: 'empty' }
-  | { kind: 'populated'; entries: readonly LibraryEntry[] }
+  | { kind: 'populated'; entries: readonly TopLevelLibraryEntry[] }
 
 export function getLibraryListState(
-  entries: readonly LibraryEntry[] | undefined,
+  entries: readonly TopLevelLibraryEntry[] | undefined,
 ): LibraryListState {
   if (entries === undefined) {
     return { kind: 'loading' }

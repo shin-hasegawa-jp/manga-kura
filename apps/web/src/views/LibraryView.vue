@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { database } from '@/database/database'
-import { createMangaRepository, type LibraryEntry } from '@/database/repository'
+import { createMangaRepository, type TopLevelLibraryEntry } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
 import { createLibraryListItemPresenter, type LibraryListItem } from './libraryListItemPresenter'
 import { getLibraryListState } from './libraryListState'
 
 const repository = createMangaRepository(database)
 const itemPresenter = createLibraryListItemPresenter(createObjectUrlRegistry())
-const entries = ref<LibraryEntry[]>()
+const entries = ref<TopLevelLibraryEntry[]>()
 const libraryState = computed(() => getLibraryListState(entries.value))
 const libraryItems = ref<LibraryListItem[]>([])
 
 async function loadLibrary() {
-  const savedEntries = await repository.library.findAll()
+  const savedEntries = await repository.topLevelLibrary.findAll()
 
   entries.value = savedEntries
   libraryItems.value = itemPresenter.present(savedEntries)
@@ -30,21 +30,22 @@ onBeforeUnmount(() => itemPresenter.dispose())
     <p v-if="libraryState.kind === 'loading'" class="status-message">読込中…</p>
 
     <p v-else-if="libraryState.kind === 'empty'" class="status-message">
-      保存済みの話はありません。
+      保存済みの作品や話はありません。
     </p>
 
-    <ul v-else class="episode-list">
-      <li v-for="item in libraryItems" :key="item.episodeId" class="episode-item">
+    <ul v-else class="library-list">
+      <li v-for="item in libraryItems" :key="item.itemId" class="library-item">
         <img
           v-if="item.thumbnailUrl"
           class="thumbnail"
           :src="item.thumbnailUrl"
-          :alt="`${item.episodeTitle}の先頭画像`"
+          :alt="`${item.title}のサムネイル`"
         />
         <div v-else class="thumbnail thumbnail-placeholder" aria-hidden="true">画像なし</div>
         <div>
-          <p class="episode-item__context" :data-kind="item.kind">{{ item.contextLabel }}</p>
-          <h2>{{ item.episodeTitle }}</h2>
+          <p class="library-item__kind" :data-kind="item.kind">{{ item.kindLabel }}</p>
+          <h2>{{ item.title }}</h2>
+          <p v-if="item.detailLabel" class="library-item__detail">{{ item.detailLabel }}</p>
         </div>
       </li>
     </ul>
@@ -71,7 +72,7 @@ h1 {
   border-radius: 0.5rem;
 }
 
-.episode-list {
+.library-list {
   display: grid;
   gap: 0.75rem;
   padding: 0;
@@ -79,7 +80,7 @@ h1 {
   list-style: none;
 }
 
-.episode-item {
+.library-item {
   display: flex;
   gap: 1rem;
   align-items: center;
@@ -88,14 +89,19 @@ h1 {
   border-radius: 0.5rem;
 }
 
-.episode-item h2 {
+.library-item h2 {
   margin-top: 0.25rem;
   font-size: 1rem;
 }
 
-.episode-item__context {
+.library-item__kind,
+.library-item__detail {
   color: rgb(var(--v-theme-on-surface-variant));
   font-size: 0.875rem;
+}
+
+.library-item__detail {
+  margin-top: 0.25rem;
 }
 
 .thumbnail {

@@ -1,26 +1,31 @@
-import type { LibraryEntry } from '@/database/repository'
+import type { TopLevelLibraryEntry } from '@/database/repository'
 
 export interface LibraryEntryText {
-  episodeId: string
-  episodeTitle: string
-  contextLabel: string
-  kind: 'series' | 'standalone'
+  itemId: string
+  title: string
+  kind: 'series' | 'standaloneEpisode'
+  kindLabel: string
+  detailLabel?: string
 }
 
-export function getLibraryEntryText(entry: LibraryEntry): LibraryEntryText {
-  if (entry.series === undefined) {
+export function getLibraryEntryText(entry: TopLevelLibraryEntry): LibraryEntryText {
+  if (entry.kind === 'standaloneEpisode') {
     return {
-      episodeId: entry.episode.id,
-      episodeTitle: entry.episode.title,
-      contextLabel: '単独の話',
-      kind: 'standalone',
+      itemId: entry.episode.id,
+      title: entry.episode.title,
+      kind: entry.kind,
+      kindLabel: '単独の話',
+      ...(entry.episode.episodeNumber !== undefined
+        ? { detailLabel: `第${entry.episode.episodeNumber}話` }
+        : {}),
     }
   }
 
   return {
-    episodeId: entry.episode.id,
-    episodeTitle: entry.episode.title,
-    contextLabel: entry.series.title,
-    kind: 'series',
+    itemId: entry.series.id,
+    title: entry.series.title,
+    kind: entry.kind,
+    kindLabel: '作品',
+    detailLabel: `全${entry.episodeCount}話`,
   }
 }

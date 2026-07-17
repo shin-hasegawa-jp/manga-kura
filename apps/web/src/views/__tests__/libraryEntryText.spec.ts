@@ -3,18 +3,21 @@ import { createDevelopmentComicFixture } from '@/database/developmentComicFixtur
 import { getLibraryEntryText } from '../libraryEntryText'
 
 describe('ライブラリ一覧項目の表示文言', () => {
-  it('作品に属する話では作品名と話タイトルを返す', () => {
+  it('作品では作品名・所属話数・作品種別を返す', () => {
     const fixture = createDevelopmentComicFixture()
 
-    expect(getLibraryEntryText({ episode: fixture.episode, series: fixture.series })).toEqual({
-      episodeId: fixture.episode.id,
-      episodeTitle: fixture.episode.title,
-      contextLabel: fixture.series.title,
+    expect(
+      getLibraryEntryText({ kind: 'series', series: fixture.series, episodeCount: 3 }),
+    ).toEqual({
+      itemId: fixture.series.id,
+      title: fixture.series.title,
       kind: 'series',
+      kindLabel: '作品',
+      detailLabel: '全3話',
     })
   })
 
-  it('単独の話では判別用の文言と話タイトルを返す', () => {
+  it('話数がある単独の話ではタイトル・話数・単独の話種別を返す', () => {
     const fixture = createDevelopmentComicFixture()
     const standaloneEpisode = {
       ...fixture.episode,
@@ -23,11 +26,28 @@ describe('ライブラリ一覧項目の表示文言', () => {
       title: '読切漫画',
     }
 
-    expect(getLibraryEntryText({ episode: standaloneEpisode })).toEqual({
-      episodeId: standaloneEpisode.id,
-      episodeTitle: standaloneEpisode.title,
-      contextLabel: '単独の話',
-      kind: 'standalone',
+    expect(getLibraryEntryText({ kind: 'standaloneEpisode', episode: standaloneEpisode })).toEqual({
+      itemId: standaloneEpisode.id,
+      title: standaloneEpisode.title,
+      kind: 'standaloneEpisode',
+      kindLabel: '単独の話',
+      detailLabel: '第1話',
+    })
+  })
+
+  it('話数がない単独の話では話数表示を返さない', () => {
+    const fixture = createDevelopmentComicFixture()
+    const standaloneEpisode = {
+      ...fixture.episode,
+      seriesId: undefined,
+      episodeNumber: undefined,
+    }
+
+    expect(getLibraryEntryText({ kind: 'standaloneEpisode', episode: standaloneEpisode })).toEqual({
+      itemId: standaloneEpisode.id,
+      title: standaloneEpisode.title,
+      kind: 'standaloneEpisode',
+      kindLabel: '単独の話',
     })
   })
 })

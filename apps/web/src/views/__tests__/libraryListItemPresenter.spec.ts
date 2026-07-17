@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDevelopmentComicFixture } from '@/database/developmentComicFixture'
+import type { TopLevelLibraryEntry } from '@/database/repository'
 import { createLibraryListItemPresenter } from '../libraryListItemPresenter'
 
 describe('ライブラリ一覧項目のサムネイル表示', () => {
-  it('先頭画像だけをObject URLへ変換し、画像がない話にはURLを設定しない', () => {
+  it('サムネイルだけをObject URLへ変換し、画像がない項目にはURLを設定しない', () => {
     const fixture = createDevelopmentComicFixture()
     const standaloneEpisode = {
       ...fixture.episode,
@@ -18,25 +19,32 @@ describe('ライブラリ一覧項目のサムネイル表示', () => {
     const presenter = createLibraryListItemPresenter(objectUrls)
 
     const items = presenter.present([
-      { episode: fixture.episode, series: fixture.series, thumbnailImage: fixture.image },
-      { episode: standaloneEpisode },
+      {
+        kind: 'series',
+        series: fixture.series,
+        episodeCount: 1,
+        thumbnailImage: fixture.image,
+      },
+      { kind: 'standaloneEpisode', episode: standaloneEpisode },
     ])
 
     expect(objectUrls.create).toHaveBeenCalledTimes(1)
     expect(objectUrls.create).toHaveBeenCalledWith(fixture.image.blob)
     expect(items).toEqual([
       {
-        episodeId: fixture.episode.id,
-        episodeTitle: fixture.episode.title,
-        contextLabel: fixture.series.title,
+        itemId: fixture.series.id,
+        title: fixture.series.title,
         kind: 'series',
+        kindLabel: '作品',
+        detailLabel: '全1話',
         thumbnailUrl: 'blob:thumbnail',
       },
       {
-        episodeId: standaloneEpisode.id,
-        episodeTitle: standaloneEpisode.title,
-        contextLabel: '単独の話',
-        kind: 'standalone',
+        itemId: standaloneEpisode.id,
+        title: standaloneEpisode.title,
+        kind: 'standaloneEpisode',
+        kindLabel: '単独の話',
+        detailLabel: '第1話',
         thumbnailUrl: undefined,
       },
     ])
@@ -49,8 +57,13 @@ describe('ライブラリ一覧項目のサムネイル表示', () => {
       revokeAll: vi.fn(),
     }
     const presenter = createLibraryListItemPresenter(objectUrls)
-    const entries = [
-      { episode: fixture.episode, series: fixture.series, thumbnailImage: fixture.image },
+    const entries: TopLevelLibraryEntry[] = [
+      {
+        kind: 'series',
+        series: fixture.series,
+        episodeCount: 1,
+        thumbnailImage: fixture.image,
+      },
     ]
 
     presenter.present(entries)
