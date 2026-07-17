@@ -82,6 +82,32 @@ describe('MangaKuraDatabase', () => {
     )
   })
 
+  it('元ページURLで作品に属する話と単独の話を検索し、未登録URLでは何も返さない', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const standaloneEpisode = {
+      ...fixture.episode,
+      id: 'standalone-episode-1',
+      seriesId: undefined,
+      title: '単独の話',
+      sourcePageUrl: 'https://example.com/standalone-episodes/1',
+    }
+
+    await repository.episodes.save(fixture.episode)
+    await repository.episodes.save(standaloneEpisode)
+
+    expect(await repository.episodes.findBySourcePageUrl(fixture.episode.sourcePageUrl)).toEqual(
+      fixture.episode,
+    )
+    expect(await repository.episodes.findBySourcePageUrl(standaloneEpisode.sourcePageUrl)).toEqual(
+      standaloneEpisode,
+    )
+    expect(
+      await repository.episodes.findBySourcePageUrl('https://example.com/not-registered'),
+    ).toBeUndefined()
+  })
+
   it('開発用画像のBlobを表示順に保存・読込する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)

@@ -10,7 +10,7 @@ import type { AppSettings, ComicImage, Episode, Series } from '@/domain/models'
 
 export interface MangaRepository {
   series: EntityRepository<Series>
-  episodes: EntityRepository<Episode>
+  episodes: EpisodeRepository
   images: ComicImageRepository
   settings: EntityRepository
 }
@@ -23,6 +23,10 @@ export interface EntityRepository<T extends { id: string } = { id: string }> {
 
 export interface ComicImageRepository extends EntityRepository<ComicImage> {
   findByEpisodeId(episodeId: string): Promise<ComicImage[]>
+}
+
+export interface EpisodeRepository extends EntityRepository<Episode> {
+  findBySourcePageUrl(sourcePageUrl: string): Promise<Episode | undefined>
 }
 
 function createEntityRepository<T extends { id: string }>(
@@ -54,10 +58,21 @@ function createComicImageRepository(table: Table<ComicImage, string>): ComicImag
   }
 }
 
+function createEpisodeRepository(table: Table<Episode, string>): EpisodeRepository {
+  const repository = createEntityRepository(table, validateEpisode)
+
+  return {
+    ...repository,
+    findBySourcePageUrl(sourcePageUrl: string) {
+      return table.where('sourcePageUrl').equals(sourcePageUrl).first()
+    },
+  }
+}
+
 export function createMangaRepository(database: MangaKuraDatabase): MangaRepository {
   return {
     series: createEntityRepository<Series>(database.series, validateSeries),
-    episodes: createEntityRepository<Episode>(database.episodes, validateEpisode),
+    episodes: createEpisodeRepository(database.episodes),
     images: createComicImageRepository(database.images),
     settings: createEntityRepository<AppSettings>(database.settings, validateAppSettings),
   }
