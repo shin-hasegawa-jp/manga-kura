@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DATABASE_NAME, DATABASE_VERSION, MangaKuraDatabase } from '../database'
 import { createDevelopmentComicFixture } from '../developmentComicFixture'
+import { createComicRegistrationService } from '../registrationService'
 import { createMangaRepository } from '../repository'
 
 const databases: MangaKuraDatabase[] = []
@@ -106,6 +107,95 @@ describe('MangaKuraDatabase', () => {
     expect(
       await repository.episodes.findBySourcePageUrl('https://example.com/not-registered'),
     ).toBeUndefined()
+  })
+
+  it('新規作品と最初の話と固定画像を同じトランザクションで保存する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const registeredAt = new Date('2026-07-17T01:00:00.000Z')
+    const identifiers = ['series-1', 'episode-1']
+    const service = createComicRegistrationService(database, {
+      createId: () => {
+        const identifier = identifiers.shift()
+
+        if (identifier === undefined) {
+          throw new Error('IDが不足しています')
+        }
+
+        return identifier
+      },
+      now: () => registeredAt,
+    })
+
+    const registered = await service.registerSeriesWithFirstEpisode({
+      registration: {
+        seriesTitle: '新規作品',
+        title: '第1話',
+        sourcePageUrl: 'https://example.com/new-series/episodes/1',
+      },
+      image: fixture.image,
+    })
+
+    expect(registered.series).toEqual({
+      id: 'series-1',
+      title: '新規作品',
+      createdAt: registeredAt,
+      updatedAt: registeredAt,
+      episodeCount: 1,
+    })
+    expect(registered.episode).toEqual({
+      id: 'episode-1',
+      seriesId: 'series-1',
+      title: '第1話',
+      sourcePageUrl: 'https://example.com/new-series/episodes/1',
+      createdAt: registeredAt,
+      updatedAt: registeredAt,
+      scrollPosition: 0,
+      scrollProgress: 0,
+    })
+    expect(registered.image).toEqual({
+      ...fixture.image,
+      episodeId: 'episode-1',
+      createdAt: registeredAt,
+    })
+    expect(await repository.series.findById(registered.series.id)).toEqual(registered.series)
+    expect(await repository.episodes.findById(registered.episode.id)).toEqual(registered.episode)
+    expect(await repository.images.findByEpisodeId(registered.episode.id)).toEqual([
+      registered.image,
+    ])
+  })
+
+  it('画像の保存に失敗した場合は作品と話を保存せずにロールバックする', async () => {
+    const database = createTestDatabase()
+    const fixture = createDevelopmentComicFixture()
+    const identifiers = ['series-rollback', 'episode-rollback']
+    const service = createComicRegistrationService(database, {
+      createId: () => {
+        const identifier = identifiers.shift()
+
+        if (identifier === undefined) {
+          throw new Error('IDが不足しています')
+        }
+
+        return identifier
+      },
+    })
+
+    await expect(
+      service.registerSeriesWithFirstEpisode({
+        registration: {
+          seriesTitle: 'ロールバック確認用作品',
+          title: '第1話',
+          sourcePageUrl: 'https://example.com/rollback/episodes/1',
+        },
+        image: { ...fixture.image, width: 0 },
+      }),
+    ).rejects.toThrow()
+
+    expect(await database.series.count()).toBe(0)
+    expect(await database.episodes.count()).toBe(0)
+    expect(await database.images.count()).toBe(0)
   })
 
   it('開発用画像のBlobを表示順に保存・読込する', async () => {
