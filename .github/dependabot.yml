@@ -1,0 +1,18 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /apps/web
+    target-branch: develop
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: uv
+    directory: /apps/api
+    target-branch: develop
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 7
