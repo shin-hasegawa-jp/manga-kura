@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { database } from '@/database/database'
 import { createMangaRepository, type TopLevelLibraryEntry } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
@@ -34,19 +35,29 @@ onBeforeUnmount(() => itemPresenter.dispose())
     </p>
 
     <ul v-else class="library-list">
-      <li v-for="item in libraryItems" :key="item.itemId" class="library-item">
-        <img
-          v-if="item.thumbnailUrl"
-          class="thumbnail"
-          :src="item.thumbnailUrl"
-          :alt="`${item.title}のサムネイル`"
-        />
-        <div v-else class="thumbnail thumbnail-placeholder" aria-hidden="true">画像なし</div>
-        <div>
-          <p class="library-item__kind" :data-kind="item.kind">{{ item.kindLabel }}</p>
-          <h2>{{ item.title }}</h2>
-          <p v-if="item.detailLabel" class="library-item__detail">{{ item.detailLabel }}</p>
-        </div>
+      <li v-for="item in libraryItems" :key="item.itemId">
+        <component
+          :is="item.kind === 'series' ? RouterLink : 'div'"
+          class="library-item"
+          :to="
+            item.kind === 'series'
+              ? { name: 'seriesDetail', params: { seriesId: item.itemId } }
+              : undefined
+          "
+        >
+          <img
+            v-if="item.thumbnailUrl"
+            class="thumbnail"
+            :src="item.thumbnailUrl"
+            :alt="`${item.title}のサムネイル`"
+          />
+          <div v-else class="thumbnail thumbnail-placeholder" aria-hidden="true">画像なし</div>
+          <div>
+            <p class="library-item__kind" :data-kind="item.kind">{{ item.kindLabel }}</p>
+            <h2>{{ item.title }}</h2>
+            <p v-if="item.detailLabel" class="library-item__detail">{{ item.detailLabel }}</p>
+          </div>
+        </component>
       </li>
     </ul>
   </main>
@@ -87,6 +98,13 @@ h1 {
   padding: 0.75rem;
   border: 1px solid rgb(var(--v-theme-outline-variant));
   border-radius: 0.5rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.library-item[href]:focus-visible {
+  outline: 0.1875rem solid rgb(var(--v-theme-primary));
+  outline-offset: 0.125rem;
 }
 
 .library-item h2 {

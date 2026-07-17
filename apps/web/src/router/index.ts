@@ -18,6 +18,11 @@ export function createAppRouter(
         component: () => import('../views/SaveView.vue'),
       },
       {
+        path: '/series/:seriesId',
+        name: 'seriesDetail',
+        component: () => import('../views/SeriesDetailView.vue'),
+      },
+      {
         path: '/reader',
         name: 'reader',
         component: () => import('../views/ReaderView.vue'),
