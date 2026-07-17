@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DATABASE_NAME, DATABASE_VERSION, MangaKuraDatabase } from '../database'
+import { createDevelopmentComicFixture } from '../developmentComicFixture'
 import { createMangaRepository } from '../repository'
 
 const databases: MangaKuraDatabase[] = []
@@ -51,5 +52,30 @@ describe('MangaKuraDatabase', () => {
 
     await expect(repository.series.save({ id: 'invalid-series' })).rejects.toThrow()
     expect(await database.series.count()).toBe(0)
+  })
+
+  it('saves and reads the development series and episode fixture without duplication', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+
+    await repository.series.save(fixture.series)
+    await repository.episodes.save(fixture.episode)
+
+    expect(await repository.series.findById(fixture.series.id)).toEqual(fixture.series)
+    expect(await repository.episodes.findById(fixture.episode.id)).toEqual(fixture.episode)
+
+    const repeatedFixture = createDevelopmentComicFixture()
+    await repository.series.save(repeatedFixture.series)
+    await repository.episodes.save(repeatedFixture.episode)
+
+    expect(await database.series.count()).toBe(1)
+    expect(await database.episodes.count()).toBe(1)
+    expect(await repository.series.findById(repeatedFixture.series.id)).toEqual(
+      repeatedFixture.series,
+    )
+    expect(await repository.episodes.findById(repeatedFixture.episode.id)).toEqual(
+      repeatedFixture.episode,
+    )
   })
 })
