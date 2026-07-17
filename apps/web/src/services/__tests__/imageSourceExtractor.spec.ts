@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { extractImageSourceCandidates, extractImageSources } from '../imageSourceExtractor'
+import {
+  extractImageSourceCandidates,
+  extractImageSources,
+  selectBestSourceFromSrcset,
+} from '../imageSourceExtractor'
 
 describe('img要素のsrc抽出', () => {
   it('画像URLをDOM上の出現順で抽出する', () => {
@@ -119,6 +123,85 @@ describe('img要素のsrc抽出', () => {
 
     expect(extractImageSourceCandidates(html)).toEqual([
       { source: '/images/page-01.jpg', attribute: 'data-original' },
+    ])
+  })
+
+  it('幅記述子を持つsrcsetから最大幅の画像を選択する', () => {
+    expect(
+      selectBestSourceFromSrcset(`
+        /images/page-320.jpg 320w,
+        /images/page-1280.jpg 1280w,
+        /images/page-640.jpg 640w
+      `),
+    ).toBe('/images/page-1280.jpg')
+  })
+
+  it('画素密度記述子を持つsrcsetから最大倍率の画像を選択する', () => {
+    expect(
+      selectBestSourceFromSrcset(`
+        /images/page.jpg 1x,
+        /images/page@3x.jpg 3x,
+        /images/page@2x.jpg 2x
+      `),
+    ).toBe('/images/page@3x.jpg')
+  })
+
+  it('記述子がない候補を1倍として扱う', () => {
+    expect(selectBestSourceFromSrcset('/images/page.jpg, /images/page@2x.jpg 2x')).toBe(
+      '/images/page@2x.jpg',
+    )
+  })
+
+  it('data-srcsetをsrcsetや単一URL属性より優先する', () => {
+    const html = `
+      <img
+        src="placeholder.gif"
+        data-src="/images/data-src.jpg"
+        srcset="/images/srcset-1x.jpg 1x, /images/srcset-2x.jpg 2x"
+        data-srcset="/images/lazy-640.jpg 640w, /images/lazy-1280.jpg 1280w"
+      >
+    `
+
+    expect(extractImageSourceCandidates(html)).toEqual([
+      { source: '/images/lazy-1280.jpg', attribute: 'data-srcset' },
+    ])
+  })
+
+  it('srcsetから選択したURLを通常の候補へ含める', () => {
+    const html = `
+      <img srcset="/images/page-1.jpg 1x, /images/page-1@2x.jpg 2x">
+      <img data-srcset="/images/page-2.jpg 400w, /images/page-2-large.jpg 800w">
+    `
+
+    expect(extractImageSourceCandidates(html)).toEqual([
+      { source: '/images/page-1@2x.jpg', attribute: 'srcset' },
+      { source: '/images/page-2-large.jpg', attribute: 'data-srcset' },
+    ])
+  })
+
+  it.each([
+    ['', undefined],
+    [' , , ', undefined],
+    ['/images/page.jpg 0w', undefined],
+    ['/images/page.jpg 0x', undefined],
+    ['/images/page.jpg invalid', undefined],
+    ['/images/small.jpg 320w, /images/large.jpg 2x', undefined],
+  ])('空または不正なsrcsetを選択しない: %s', (srcset, expected) => {
+    expect(selectBestSourceFromSrcset(srcset)).toBe(expected)
+  })
+
+  it('不正なsrcsetでは次の有効な画像属性へフォールバックする', () => {
+    const html = `
+      <img
+        data-srcset="/images/page.jpg invalid"
+        srcset=""
+        data-src="/images/fallback.jpg"
+        src="placeholder.gif"
+      >
+    `
+
+    expect(extractImageSourceCandidates(html)).toEqual([
+      { source: '/images/fallback.jpg', attribute: 'data-src' },
     ])
   })
 })
