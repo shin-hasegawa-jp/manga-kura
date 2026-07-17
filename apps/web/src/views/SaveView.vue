@@ -12,6 +12,10 @@ import {
   submitNewSeriesRegistration,
   type NewSeriesRegistrationSubmission,
 } from './saveNewSeriesRegistration'
+import {
+  submitStandaloneEpisodeRegistration,
+  type StandaloneEpisodeRegistrationSubmission,
+} from './saveStandaloneEpisodeRegistration'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
 const registrationFields = computed(() => getRegistrationFields(registrationMode.value))
@@ -21,10 +25,15 @@ const newSeriesEpisodeTitle = ref('')
 const newSeriesSourcePageUrl = ref('')
 const newSeriesSubmission = ref<NewSeriesRegistrationSubmission>()
 const isSubmittingNewSeries = ref(false)
+const standaloneEpisodeTitle = ref('')
+const standaloneEpisodeSourcePageUrl = ref('')
+const standaloneEpisodeSubmission = ref<StandaloneEpisodeRegistrationSubmission>()
+const isSubmittingStandaloneEpisode = ref(false)
 
 function selectRegistrationMode(mode: RegistrationMode) {
   registrationMode.value = mode
   newSeriesSubmission.value = undefined
+  standaloneEpisodeSubmission.value = undefined
 }
 
 function createFixedImageForRegistration() {
@@ -48,6 +57,23 @@ async function registerNewSeries() {
     )
   } finally {
     isSubmittingNewSeries.value = false
+  }
+}
+
+async function registerStandaloneEpisode() {
+  isSubmittingStandaloneEpisode.value = true
+
+  try {
+    standaloneEpisodeSubmission.value = await submitStandaloneEpisodeRegistration(
+      registrationService,
+      {
+        title: standaloneEpisodeTitle.value,
+        sourcePageUrl: standaloneEpisodeSourcePageUrl.value,
+      },
+      createFixedImageForRegistration(),
+    )
+  } finally {
+    isSubmittingStandaloneEpisode.value = false
   }
 }
 </script>
@@ -100,6 +126,33 @@ async function registerNewSeries() {
         role="status"
       >
         {{ newSeriesSubmission.message }}
+      </p>
+    </form>
+
+    <form
+      v-else-if="registrationMode === 'standaloneEpisode'"
+      class="registration-fields"
+      aria-label="単独の話の入力項目"
+      @submit.prevent="registerStandaloneEpisode"
+    >
+      <label class="registration-fields__label">
+        <span>話タイトル</span>
+        <input v-model="standaloneEpisodeTitle" name="title" type="text" />
+      </label>
+      <label class="registration-fields__label">
+        <span>元ページURL</span>
+        <input v-model="standaloneEpisodeSourcePageUrl" name="sourcePageUrl" type="url" />
+      </label>
+      <button class="registration-submit" :disabled="isSubmittingStandaloneEpisode" type="submit">
+        {{ isSubmittingStandaloneEpisode ? '登録中…' : '単独の話を登録' }}
+      </button>
+      <p
+        v-if="standaloneEpisodeSubmission"
+        class="registration-message"
+        :class="`registration-message--${standaloneEpisodeSubmission.status}`"
+        role="status"
+      >
+        {{ standaloneEpisodeSubmission.message }}
       </p>
     </form>
 
