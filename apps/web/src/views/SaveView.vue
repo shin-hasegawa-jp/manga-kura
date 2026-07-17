@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { database } from '@/database/database'
 import { createDevelopmentComicFixture } from '@/database/developmentComicFixture'
 import { createComicRegistrationService } from '@/database/registrationService'
+import { createMangaRepository } from '@/database/repository'
+import type { Series } from '@/domain/models'
+import { registrationModeOptions, type RegistrationMode } from './saveRegistrationMode'
 import {
-  getRegistrationFields,
-  registrationModeOptions,
-  type RegistrationMode,
-} from './saveRegistrationMode'
+  submitExistingSeriesEpisodeRegistration,
+  type ExistingSeriesEpisodeRegistrationSubmission,
+} from './saveExistingSeriesEpisodeRegistration'
 import {
   submitNewSeriesRegistration,
   type NewSeriesRegistrationSubmission,
@@ -18,8 +20,8 @@ import {
 } from './saveStandaloneEpisodeRegistration'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
-const registrationFields = computed(() => getRegistrationFields(registrationMode.value))
 const registrationService = createComicRegistrationService(database)
+const repository = createMangaRepository(database)
 const newSeriesTitle = ref('')
 const newSeriesEpisodeTitle = ref('')
 const newSeriesSourcePageUrl = ref('')
@@ -29,11 +31,26 @@ const standaloneEpisodeTitle = ref('')
 const standaloneEpisodeSourcePageUrl = ref('')
 const standaloneEpisodeSubmission = ref<StandaloneEpisodeRegistrationSubmission>()
 const isSubmittingStandaloneEpisode = ref(false)
+const seriesOptions = ref<Series[]>([])
+const existingSeriesId = ref('')
+const existingSeriesEpisodeTitle = ref('')
+const existingSeriesEpisodeSourcePageUrl = ref('')
+const existingSeriesEpisodeSubmission = ref<ExistingSeriesEpisodeRegistrationSubmission>()
+const isSubmittingExistingSeriesEpisode = ref(false)
 
 function selectRegistrationMode(mode: RegistrationMode) {
   registrationMode.value = mode
   newSeriesSubmission.value = undefined
   standaloneEpisodeSubmission.value = undefined
+  existingSeriesEpisodeSubmission.value = undefined
+
+  if (mode === 'existingSeries') {
+    void loadSeriesOptions()
+  }
+}
+
+async function loadSeriesOptions() {
+  seriesOptions.value = await repository.series.findAll()
 }
 
 function createFixedImageForRegistration() {
@@ -76,6 +93,28 @@ async function registerStandaloneEpisode() {
     isSubmittingStandaloneEpisode.value = false
   }
 }
+
+async function registerExistingSeriesEpisode() {
+  isSubmittingExistingSeriesEpisode.value = true
+
+  try {
+    existingSeriesEpisodeSubmission.value = await submitExistingSeriesEpisodeRegistration(
+      registrationService,
+      {
+        seriesId: existingSeriesId.value,
+        title: existingSeriesEpisodeTitle.value,
+        sourcePageUrl: existingSeriesEpisodeSourcePageUrl.value,
+      },
+      createFixedImageForRegistration(),
+    )
+  } finally {
+    isSubmittingExistingSeriesEpisode.value = false
+  }
+}
+
+onMounted(() => {
+  void loadSeriesOptions()
+})
 </script>
 
 <template>
@@ -156,16 +195,45 @@ async function registerStandaloneEpisode() {
       </p>
     </form>
 
-    <section v-else class="registration-fields" :aria-label="`${registrationMode}の入力項目`">
-      <label
-        v-for="field in registrationFields"
-        :key="field.name"
-        class="registration-fields__label"
-      >
-        <span>{{ field.label }}</span>
-        <input :name="field.name" :type="field.inputType" />
+    <form
+      v-else
+      class="registration-fields"
+      aria-label="既存作品への話追加の入力項目"
+      @submit.prevent="registerExistingSeriesEpisode"
+    >
+      <label class="registration-fields__label">
+        <span>追加先作品</span>
+        <select v-model="existingSeriesId" name="seriesId">
+          <option value="">作品を選択してください</option>
+          <option v-for="series in seriesOptions" :key="series.id" :value="series.id">
+            {{ series.title }}
+          </option>
+        </select>
       </label>
-    </section>
+      <label class="registration-fields__label">
+        <span>話タイトル</span>
+        <input v-model="existingSeriesEpisodeTitle" name="title" type="text" />
+      </label>
+      <label class="registration-fields__label">
+        <span>元ページURL</span>
+        <input v-model="existingSeriesEpisodeSourcePageUrl" name="sourcePageUrl" type="url" />
+      </label>
+      <button
+        class="registration-submit"
+        :disabled="isSubmittingExistingSeriesEpisode"
+        type="submit"
+      >
+        {{ isSubmittingExistingSeriesEpisode ? '登録中…' : '作品へ話を追加' }}
+      </button>
+      <p
+        v-if="existingSeriesEpisodeSubmission"
+        class="registration-message"
+        :class="`registration-message--${existingSeriesEpisodeSubmission.status}`"
+        role="status"
+      >
+        {{ existingSeriesEpisodeSubmission.message }}
+      </p>
+    </form>
   </main>
 </template>
 
@@ -230,7 +298,8 @@ h1 {
   font-weight: 600;
 }
 
-.registration-fields__label input {
+.registration-fields__label input,
+.registration-fields__label select {
   min-height: 3rem;
   padding: 0 0.75rem;
   color: rgb(var(--v-theme-on-surface));
@@ -240,7 +309,8 @@ h1 {
   border-radius: 0.25rem;
 }
 
-.registration-fields__label input:focus-visible {
+.registration-fields__label input:focus-visible,
+.registration-fields__label select:focus-visible {
   border-color: rgb(var(--v-theme-primary));
   outline: 0.125rem solid rgb(var(--v-theme-primary));
   outline-offset: -0.125rem;
