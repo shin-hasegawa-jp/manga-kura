@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractImageSources } from '../imageSourceExtractor'
+import { extractImageSourceCandidates, extractImageSources } from '../imageSourceExtractor'
 
 describe('img要素のsrc抽出', () => {
   it('画像URLをDOM上の出現順で抽出する', () => {
@@ -64,6 +64,61 @@ describe('img要素のsrc抽出', () => {
       '/images/page-01.jpg',
       '/images/page-02.jpg',
       '/images/page-03.jpg',
+    ])
+  })
+
+  it.each([
+    ['data-src', '/images/data-src.jpg'],
+    ['data-original', '/images/data-original.jpg'],
+    ['data-lazy-src', '/images/data-lazy-src.jpg'],
+    ['data-original-src', '/images/data-original-src.jpg'],
+    ['data-lazy', '/images/data-lazy.jpg'],
+  ])('%sからlazy-load先の画像URLを抽出する', (attribute, source) => {
+    expect(extractImageSources(`<img ${attribute}="${source}">`)).toEqual([source])
+  })
+
+  it('同じimgでは優先順位が高い属性を抽出元として採用する', () => {
+    const html = `
+      <img
+        src="data:image/gif;base64,placeholder"
+        data-lazy="/images/data-lazy.jpg"
+        data-original-src="/images/data-original-src.jpg"
+        data-lazy-src="/images/data-lazy-src.jpg"
+        data-original="/images/data-original.jpg"
+        data-src="/images/data-src.jpg"
+      >
+    `
+
+    expect(extractImageSourceCandidates(html)).toEqual([
+      { source: '/images/data-src.jpg', attribute: 'data-src' },
+    ])
+  })
+
+  it('空のlazy-load属性を飛ばして次の有効な属性を採用する', () => {
+    const html = `
+      <img
+        src="data:image/gif;base64,placeholder"
+        data-src="   "
+        data-original=""
+        data-lazy-src="/images/actual-page.jpg"
+      >
+      <img src="/images/src-fallback.jpg" data-src="">
+    `
+
+    expect(extractImageSourceCandidates(html)).toEqual([
+      { source: '/images/actual-page.jpg', attribute: 'data-lazy-src' },
+      { source: '/images/src-fallback.jpg', attribute: 'src' },
+    ])
+  })
+
+  it('lazy-load属性とsrcに同じURLがある場合も最初の候補だけを残す', () => {
+    const html = `
+      <img data-original="/images/page-01.jpg" src="placeholder.gif">
+      <img src="/images/page-01.jpg">
+    `
+
+    expect(extractImageSourceCandidates(html)).toEqual([
+      { source: '/images/page-01.jpg', attribute: 'data-original' },
     ])
   })
 })
