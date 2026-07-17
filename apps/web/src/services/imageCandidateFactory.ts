@@ -13,6 +13,8 @@ export interface ImageCandidate {
   sourceAttribute: ImageSourceAttribute
   isSelected: boolean
   fetchStatus: ImageCandidateFetchStatus
+  width?: number
+  height?: number
 }
 
 export function createImageCandidates(
