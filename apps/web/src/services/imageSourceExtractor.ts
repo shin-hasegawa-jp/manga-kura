@@ -132,6 +132,10 @@ export function extractImageSourceCandidates(
   dependencies: ImageSourceExtractorDependencies = defaultDependencies,
 ): ExtractedImageSource[] {
   const document = dependencies.parseHtml(html)
+  return extractImageSourceCandidatesFromDocument(document)
+}
+
+function extractImageSourceCandidatesFromDocument(document: Document): ExtractedImageSource[] {
   const candidates: ExtractedImageSource[] = []
   const seenSources = new Set<string>()
 
@@ -147,6 +151,57 @@ export function extractImageSourceCandidates(
   }
 
   return candidates
+}
+
+function isHttpUrl(url: URL): boolean {
+  return url.protocol === 'http:' || url.protocol === 'https:'
+}
+
+function resolveDocumentBaseUrl(document: Document, pageUrl: URL): URL {
+  const baseHref = document.querySelector('base[href]')?.getAttribute('href')?.trim() ?? ''
+
+  if (baseHref === '') {
+    return pageUrl
+  }
+
+  try {
+    const baseUrl = new URL(baseHref, pageUrl)
+
+    return isHttpUrl(baseUrl) ? baseUrl : pageUrl
+  } catch {
+    return pageUrl
+  }
+}
+
+export function resolveImageSourceCandidates(
+  html: string,
+  pageUrl: string,
+  dependencies: ImageSourceExtractorDependencies = defaultDependencies,
+): ExtractedImageSource[] {
+  const document = dependencies.parseHtml(html)
+  const parsedPageUrl = new URL(pageUrl)
+  const baseUrl = resolveDocumentBaseUrl(document, parsedPageUrl)
+  const resolvedCandidates: ExtractedImageSource[] = []
+  const seenSources = new Set<string>()
+
+  for (const candidate of extractImageSourceCandidatesFromDocument(document)) {
+    let resolvedUrl: URL
+
+    try {
+      resolvedUrl = new URL(candidate.source, baseUrl)
+    } catch {
+      continue
+    }
+
+    if (!isHttpUrl(resolvedUrl) || seenSources.has(resolvedUrl.href)) {
+      continue
+    }
+
+    seenSources.add(resolvedUrl.href)
+    resolvedCandidates.push({ ...candidate, source: resolvedUrl.href })
+  }
+
+  return resolvedCandidates
 }
 
 export function extractImageSources(

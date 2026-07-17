@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   extractImageSourceCandidates,
   extractImageSources,
+  resolveImageSourceCandidates,
   selectBestSourceFromSrcset,
 } from '../imageSourceExtractor'
 
@@ -202,6 +203,86 @@ describe('img要素のsrc抽出', () => {
 
     expect(extractImageSourceCandidates(html)).toEqual([
       { source: '/images/fallback.jpg', attribute: 'data-src' },
+    ])
+  })
+
+  it('ページURLを基準に各形式の画像URLを絶対URL化する', () => {
+    const html = `
+      <img src="//cdn.example.com/images/protocol-relative.jpg">
+      <img src="/images/root-relative.jpg">
+      <img src="images/path-relative.jpg">
+      <img src="?image=queried">
+      <img src="https://static.example.com/images/absolute.jpg">
+    `
+
+    expect(resolveImageSourceCandidates(html, 'https://example.com/comic/episode/1')).toEqual([
+      {
+        source: 'https://cdn.example.com/images/protocol-relative.jpg',
+        attribute: 'src',
+      },
+      { source: 'https://example.com/images/root-relative.jpg', attribute: 'src' },
+      {
+        source: 'https://example.com/comic/episode/images/path-relative.jpg',
+        attribute: 'src',
+      },
+      { source: 'https://example.com/comic/episode/1?image=queried', attribute: 'src' },
+      { source: 'https://static.example.com/images/absolute.jpg', attribute: 'src' },
+    ])
+  })
+
+  it('有効なbase要素を画像URL解決の基準にする', () => {
+    const html = `
+      <base href="https://assets.example.com/comics/series-a/">
+      <base href="https://ignored.example.com/">
+      <img src="pages/01.jpg">
+      <img src="/shared/cover.jpg">
+    `
+
+    expect(resolveImageSourceCandidates(html, 'https://example.com/reader/1')).toEqual([
+      {
+        source: 'https://assets.example.com/comics/series-a/pages/01.jpg',
+        attribute: 'src',
+      },
+      { source: 'https://assets.example.com/shared/cover.jpg', attribute: 'src' },
+    ])
+  })
+
+  it.each([
+    '<base href="http://[invalid">',
+    '<base href="data:text/plain,invalid">',
+    '<base href="">',
+  ])('無効または許可しないbase要素ではページURLへフォールバックする', (baseElement) => {
+    const html = `${baseElement}<img src="images/page.jpg">`
+
+    expect(resolveImageSourceCandidates(html, 'https://example.com/comic/1')).toEqual([
+      { source: 'https://example.com/comic/images/page.jpg', attribute: 'src' },
+    ])
+  })
+
+  it('解決不能またはhttpとhttps以外の画像URLを除外する', () => {
+    const html = `
+      <img src="http://[invalid">
+      <img src="data:image/png;base64,placeholder">
+      <img src="blob:https://example.com/image-id">
+      <img src="file:///images/page.jpg">
+      <img src="javascript:alert(1)">
+      <img src="https://example.com/images/valid.jpg">
+    `
+
+    expect(resolveImageSourceCandidates(html, 'https://example.com/comic/1')).toEqual([
+      { source: 'https://example.com/images/valid.jpg', attribute: 'src' },
+    ])
+  })
+
+  it('絶対URL化後に重複する候補を最初の出現順を保って除外する', () => {
+    const html = `
+      <img src="/images/page.jpg">
+      <img data-src="https://example.com/images/page.jpg">
+      <img src="../images/page.jpg">
+    `
+
+    expect(resolveImageSourceCandidates(html, 'https://example.com/comic/1')).toEqual([
+      { source: 'https://example.com/images/page.jpg', attribute: 'src' },
     ])
   })
 })
