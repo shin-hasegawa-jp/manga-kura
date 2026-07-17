@@ -12,7 +12,9 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "lint:ci": "eslint .",
+    "format": "prettier --write --experimental-cli src/",
+    "format:ci": "prettier --check src/"
   },
   "dependencies": {
     "dexie": "^4.4.4",
