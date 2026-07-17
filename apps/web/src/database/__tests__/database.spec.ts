@@ -66,6 +66,7 @@ describe('MangaKuraDatabase', () => {
 
     expect(await repository.series.findById(fixture.series.id)).toEqual(fixture.series)
     expect(await repository.episodes.findById(fixture.episode.id)).toEqual(fixture.episode)
+    expect(await repository.episodes.findAll()).toEqual([fixture.episode])
 
     const repeatedFixture = createDevelopmentComicFixture()
     await repository.series.save(repeatedFixture.series)

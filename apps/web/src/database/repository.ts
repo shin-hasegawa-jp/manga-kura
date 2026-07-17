@@ -18,6 +18,7 @@ export interface MangaRepository {
 export interface EntityRepository<T extends { id: string } = { id: string }> {
   save(input: unknown): Promise<string>
   findById(id: string): Promise<T | undefined>
+  findAll(): Promise<T[]>
 }
 
 export interface ComicImageRepository extends EntityRepository<ComicImage> {
@@ -35,6 +36,9 @@ function createEntityRepository<T extends { id: string }>(
     },
     findById(id: string) {
       return table.get(id)
+    },
+    findAll() {
+      return table.toArray()
     },
   }
 }
