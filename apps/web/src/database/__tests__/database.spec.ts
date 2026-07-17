@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DATABASE_NAME, DATABASE_VERSION, MangaKuraDatabase } from '../database'
 import { createDevelopmentComicFixture } from '../developmentComicFixture'
-import { createComicRegistrationService } from '../registrationService'
+import { createComicRegistrationService, createRegistrationId } from '../registrationService'
 import { createMangaRepository } from '../repository'
 
 const databases: MangaKuraDatabase[] = []
@@ -27,6 +27,12 @@ describe('MangaKuraDatabase', () => {
     expect(database.verno).toBe(DATABASE_VERSION)
 
     database.close()
+  })
+
+  it('登録用の識別子を生成する', () => {
+    expect(createRegistrationId()).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
   })
 
   it('必要なストア、主キー、インデックスを定義する', async () => {

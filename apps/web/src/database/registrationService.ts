@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { ComicImage, Episode, Series } from '@/domain/models'
 import {
   type AddEpisodeToSeriesRegistration,
@@ -62,12 +63,16 @@ export interface ComicRegistrationService {
   addEpisodeToSeries(input: AddEpisodeToSeriesInput): Promise<AddedEpisodeToSeries>
 }
 
+export function createRegistrationId(): string {
+  return globalThis.crypto?.randomUUID() ?? uuidv4()
+}
+
 export function createComicRegistrationService(
   database: MangaKuraDatabase,
   dependencies: RegistrationServiceDependencies = {},
 ): ComicRegistrationService {
   const repository = createMangaRepository(database)
-  const createId = dependencies.createId ?? crypto.randomUUID
+  const createId = dependencies.createId ?? createRegistrationId
   const now = dependencies.now ?? (() => new Date())
 
   return {

@@ -2,7 +2,10 @@
 import { onMounted, ref } from 'vue'
 import { database } from '@/database/database'
 import { createDevelopmentComicFixture } from '@/database/developmentComicFixture'
-import { createComicRegistrationService } from '@/database/registrationService'
+import {
+  createComicRegistrationService,
+  createRegistrationId,
+} from '@/database/registrationService'
 import { createMangaRepository } from '@/database/repository'
 import type { Series } from '@/domain/models'
 import { registrationModeOptions, type RegistrationMode } from './saveRegistrationMode'
@@ -56,7 +59,7 @@ async function loadSeriesOptions() {
 function createFixedImageForRegistration() {
   const image = createDevelopmentComicFixture().image
 
-  return { ...image, id: crypto.randomUUID() }
+  return { ...image, id: createRegistrationId() }
 }
 
 async function registerNewSeries() {
