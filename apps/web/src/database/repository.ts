@@ -33,6 +33,7 @@ export interface EpisodeRepository extends EntityRepository<Episode> {
 export interface LibraryEntry {
   episode: Episode
   series?: Series
+  thumbnailImage?: ComicImage
 }
 
 export interface LibraryRepository {
@@ -82,15 +83,29 @@ function createEpisodeRepository(table: Table<Episode, string>): EpisodeReposito
 function createLibraryRepository(database: MangaKuraDatabase): LibraryRepository {
   return {
     async findAll() {
-      const [episodes, series] = await Promise.all([
+      const [episodes, series, images] = await Promise.all([
         database.episodes.toArray(),
         database.series.toArray(),
+        database.images.toArray(),
       ])
       const seriesById = new Map(series.map((item) => [item.id, item]))
+      const firstImageByEpisodeId = new Map<string, ComicImage>()
+
+      for (const image of images) {
+        const currentFirstImage = firstImageByEpisodeId.get(image.episodeId)
+
+        if (
+          currentFirstImage === undefined ||
+          image.displayOrder < currentFirstImage.displayOrder
+        ) {
+          firstImageByEpisodeId.set(image.episodeId, image)
+        }
+      }
 
       return episodes.map((episode) => ({
         episode,
         series: episode.seriesId ? seriesById.get(episode.seriesId) : undefined,
+        thumbnailImage: firstImageByEpisodeId.get(episode.id),
       }))
     },
   }

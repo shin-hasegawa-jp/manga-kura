@@ -128,15 +128,22 @@ describe('MangaKuraDatabase', () => {
       scrollPosition: 0,
       scrollProgress: 0,
     }
+    const laterImage = {
+      ...fixture.image,
+      id: 'development-image-2',
+      displayOrder: 1,
+    }
 
     expect(await repository.library.findAll()).toEqual([])
 
     await repository.series.save(fixture.series)
     await repository.episodes.save(fixture.episode)
     await repository.episodes.save(standaloneEpisode)
+    await repository.images.save(laterImage)
+    await repository.images.save(fixture.image)
 
     expect(await repository.library.findAll()).toEqual([
-      { episode: fixture.episode, series: fixture.series },
+      { episode: fixture.episode, series: fixture.series, thumbnailImage: fixture.image },
       { episode: standaloneEpisode },
     ])
   })

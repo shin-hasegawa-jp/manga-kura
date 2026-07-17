@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { database } from '@/database/database'
 import { createMangaRepository, type LibraryEntry } from '@/database/repository'
-import { getLibraryEntryText } from './libraryEntryText'
+import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import { createLibraryListItemPresenter, type LibraryListItem } from './libraryListItemPresenter'
 import { getLibraryListState } from './libraryListState'
 
 const repository = createMangaRepository(database)
+const itemPresenter = createLibraryListItemPresenter(createObjectUrlRegistry())
 const entries = ref<LibraryEntry[]>()
 const libraryState = computed(() => getLibraryListState(entries.value))
-const libraryItems = computed(() => entries.value?.map(getLibraryEntryText) ?? [])
+const libraryItems = ref<LibraryListItem[]>([])
 
 async function loadLibrary() {
-  entries.value = await repository.library.findAll()
+  const savedEntries = await repository.library.findAll()
+
+  entries.value = savedEntries
+  libraryItems.value = itemPresenter.present(savedEntries)
 }
 
 onMounted(loadLibrary)
+onBeforeUnmount(() => itemPresenter.dispose())
 </script>
 
 <template>
@@ -29,8 +35,17 @@ onMounted(loadLibrary)
 
     <ul v-else class="episode-list">
       <li v-for="item in libraryItems" :key="item.episodeId" class="episode-item">
-        <p class="episode-item__context" :data-kind="item.kind">{{ item.contextLabel }}</p>
-        <h2>{{ item.episodeTitle }}</h2>
+        <img
+          v-if="item.thumbnailUrl"
+          class="thumbnail"
+          :src="item.thumbnailUrl"
+          :alt="`${item.episodeTitle}の先頭画像`"
+        />
+        <div v-else class="thumbnail thumbnail-placeholder" aria-hidden="true">画像なし</div>
+        <div>
+          <p class="episode-item__context" :data-kind="item.kind">{{ item.contextLabel }}</p>
+          <h2>{{ item.episodeTitle }}</h2>
+        </div>
       </li>
     </ul>
   </main>
@@ -65,6 +80,9 @@ h1 {
 }
 
 .episode-item {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
   padding: 0.75rem;
   border: 1px solid rgb(var(--v-theme-outline-variant));
   border-radius: 0.5rem;
@@ -78,5 +96,22 @@ h1 {
 .episode-item__context {
   color: rgb(var(--v-theme-on-surface-variant));
   font-size: 0.875rem;
+}
+
+.thumbnail {
+  display: block;
+  flex: 0 0 auto;
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: cover;
+  border-radius: 0.4rem;
+}
+
+.thumbnail-placeholder {
+  display: grid;
+  place-items: center;
+  color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.75rem;
+  background: rgb(var(--v-theme-surface-variant));
 }
 </style>
