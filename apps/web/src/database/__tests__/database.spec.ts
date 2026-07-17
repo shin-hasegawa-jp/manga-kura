@@ -148,6 +148,88 @@ describe('MangaKuraDatabase', () => {
     ])
   })
 
+  it('作品を集約し、単独の話と同じトップ一覧モデルとして読込する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const secondEpisode = {
+      ...fixture.episode,
+      id: 'development-episode-2',
+      title: '第2話',
+      episodeNumber: 2,
+      sourcePageUrl: 'https://example.com/development-series/episodes/2',
+    }
+    const standaloneEpisode = {
+      ...fixture.episode,
+      id: 'standalone-episode-1',
+      seriesId: undefined,
+      title: '単独の話',
+      episodeNumber: undefined,
+      sourcePageUrl: 'https://example.com/standalone-episodes/1',
+    }
+    const standaloneImage = {
+      ...fixture.image,
+      id: 'standalone-image-1',
+      episodeId: standaloneEpisode.id,
+      sourceUrl: 'https://example.com/standalone-episodes/1/images/1.png',
+    }
+    const laterSeriesImage = {
+      ...fixture.image,
+      id: 'development-image-2',
+      episodeId: secondEpisode.id,
+      sourceUrl: 'https://example.com/development-series/episodes/2/images/1.png',
+    }
+
+    await repository.series.save({ ...fixture.series, episodeCount: 2 })
+    await repository.episodes.save(secondEpisode)
+    await repository.episodes.save(fixture.episode)
+    await repository.episodes.save(standaloneEpisode)
+    await repository.images.save(laterSeriesImage)
+    await repository.images.save(fixture.image)
+    await repository.images.save(standaloneImage)
+
+    expect(await repository.topLevelLibrary.findAll()).toEqual([
+      {
+        kind: 'series',
+        series: { ...fixture.series, episodeCount: 2 },
+        episodeCount: 2,
+        thumbnailImage: fixture.image,
+      },
+      {
+        kind: 'standaloneEpisode',
+        episode: standaloneEpisode,
+        thumbnailImage: standaloneImage,
+      },
+    ])
+  })
+
+  it('画像や所属する話がないデータもトップ一覧モデルとして読込する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const emptySeries = {
+      ...fixture.series,
+      id: 'empty-series',
+      title: '話がない作品',
+      episodeCount: 0,
+    }
+    const standaloneEpisode = {
+      ...fixture.episode,
+      id: 'standalone-without-image',
+      seriesId: undefined,
+      title: '画像がない単独の話',
+      sourcePageUrl: 'https://example.com/standalone-without-image',
+    }
+
+    await repository.series.save(emptySeries)
+    await repository.episodes.save(standaloneEpisode)
+
+    expect(await repository.topLevelLibrary.findAll()).toEqual([
+      { kind: 'series', series: emptySeries, episodeCount: 0 },
+      { kind: 'standaloneEpisode', episode: standaloneEpisode },
+    ])
+  })
+
   it('新規作品と最初の話と固定画像を同じトランザクションで保存する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)

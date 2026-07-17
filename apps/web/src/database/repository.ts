@@ -14,6 +14,7 @@ export interface MangaRepository {
   images: ComicImageRepository
   settings: EntityRepository
   library: LibraryRepository
+  topLevelLibrary: TopLevelLibraryRepository
 }
 
 export interface EntityRepository<T extends { id: string } = { id: string }> {
@@ -38,6 +39,25 @@ export interface LibraryEntry {
 
 export interface LibraryRepository {
   findAll(): Promise<LibraryEntry[]>
+}
+
+export type TopLevelLibraryEntry = SeriesLibraryEntry | StandaloneEpisodeLibraryEntry
+
+export interface SeriesLibraryEntry {
+  kind: 'series'
+  series: Series
+  episodeCount: number
+  thumbnailImage?: ComicImage
+}
+
+export interface StandaloneEpisodeLibraryEntry {
+  kind: 'standaloneEpisode'
+  episode: Episode
+  thumbnailImage?: ComicImage
+}
+
+export interface TopLevelLibraryRepository {
+  findAll(): Promise<TopLevelLibraryEntry[]>
 }
 
 function createEntityRepository<T extends { id: string }>(
@@ -111,6 +131,90 @@ function createLibraryRepository(database: MangaKuraDatabase): LibraryRepository
   }
 }
 
+function compareEpisodesForSeriesThumbnail(left: Episode, right: Episode): number {
+  if (left.episodeNumber !== undefined && right.episodeNumber !== undefined) {
+    const episodeNumberDifference = left.episodeNumber - right.episodeNumber
+
+    if (episodeNumberDifference !== 0) {
+      return episodeNumberDifference
+    }
+  } else if (left.episodeNumber !== undefined) {
+    return -1
+  } else if (right.episodeNumber !== undefined) {
+    return 1
+  }
+
+  const createdAtDifference = left.createdAt.getTime() - right.createdAt.getTime()
+
+  return createdAtDifference !== 0 ? createdAtDifference : left.id.localeCompare(right.id)
+}
+
+function findFirstImagesByEpisodeId(images: ComicImage[]): Map<string, ComicImage> {
+  const firstImageByEpisodeId = new Map<string, ComicImage>()
+
+  for (const image of images) {
+    const currentFirstImage = firstImageByEpisodeId.get(image.episodeId)
+
+    if (currentFirstImage === undefined || image.displayOrder < currentFirstImage.displayOrder) {
+      firstImageByEpisodeId.set(image.episodeId, image)
+    }
+  }
+
+  return firstImageByEpisodeId
+}
+
+function createTopLevelLibraryRepository(database: MangaKuraDatabase): TopLevelLibraryRepository {
+  return {
+    async findAll() {
+      const [series, episodes, images] = await Promise.all([
+        database.series.toArray(),
+        database.episodes.toArray(),
+        database.images.toArray(),
+      ])
+      const firstImageByEpisodeId = findFirstImagesByEpisodeId(images)
+      const episodesBySeriesId = new Map<string, Episode[]>()
+      const standaloneEpisodes: Episode[] = []
+
+      for (const episode of episodes) {
+        if (episode.seriesId === undefined) {
+          standaloneEpisodes.push(episode)
+          continue
+        }
+
+        const seriesEpisodes = episodesBySeriesId.get(episode.seriesId) ?? []
+        seriesEpisodes.push(episode)
+        episodesBySeriesId.set(episode.seriesId, seriesEpisodes)
+      }
+
+      const seriesEntries: SeriesLibraryEntry[] = series.map((item) => {
+        const seriesEpisodes = episodesBySeriesId.get(item.id) ?? []
+        const firstEpisode = [...seriesEpisodes].sort(compareEpisodesForSeriesThumbnail)[0]
+        const thumbnailImage = firstEpisode ? firstImageByEpisodeId.get(firstEpisode.id) : undefined
+
+        return {
+          kind: 'series',
+          series: item,
+          episodeCount: seriesEpisodes.length,
+          ...(thumbnailImage ? { thumbnailImage } : {}),
+        }
+      })
+      const standaloneEntries: StandaloneEpisodeLibraryEntry[] = standaloneEpisodes.map(
+        (episode) => {
+          const thumbnailImage = firstImageByEpisodeId.get(episode.id)
+
+          return {
+            kind: 'standaloneEpisode',
+            episode,
+            ...(thumbnailImage ? { thumbnailImage } : {}),
+          }
+        },
+      )
+
+      return [...seriesEntries, ...standaloneEntries]
+    },
+  }
+}
+
 export function createMangaRepository(database: MangaKuraDatabase): MangaRepository {
   return {
     series: createEntityRepository<Series>(database.series, validateSeries),
@@ -118,5 +222,6 @@ export function createMangaRepository(database: MangaKuraDatabase): MangaReposit
     images: createComicImageRepository(database.images),
     settings: createEntityRepository<AppSettings>(database.settings, validateAppSettings),
     library: createLibraryRepository(database),
+    topLevelLibrary: createTopLevelLibraryRepository(database),
   }
 }
