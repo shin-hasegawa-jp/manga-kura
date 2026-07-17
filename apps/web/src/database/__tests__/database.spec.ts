@@ -232,6 +232,96 @@ describe('MangaKuraDatabase', () => {
     ])
   })
 
+  it('既存作品へ話と固定画像を追加し、話数を更新する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const registeredAt = new Date('2026-07-17T03:00:00.000Z')
+    const service = createComicRegistrationService(database, {
+      createId: () => 'development-episode-2',
+      now: () => registeredAt,
+    })
+
+    await repository.series.save(fixture.series)
+
+    const added = await service.addEpisodeToSeries({
+      registration: {
+        seriesId: fixture.series.id,
+        title: '第2話',
+        sourcePageUrl: 'https://example.com/development-series/episodes/2',
+      },
+      image: { ...fixture.image, id: 'development-image-2' },
+    })
+
+    expect(added.series).toEqual({
+      ...fixture.series,
+      episodeCount: 2,
+      updatedAt: registeredAt,
+    })
+    expect(added.episode).toEqual({
+      id: 'development-episode-2',
+      seriesId: fixture.series.id,
+      title: '第2話',
+      sourcePageUrl: 'https://example.com/development-series/episodes/2',
+      createdAt: registeredAt,
+      updatedAt: registeredAt,
+      scrollPosition: 0,
+      scrollProgress: 0,
+    })
+    expect(await repository.series.findById(fixture.series.id)).toEqual(added.series)
+    expect(await repository.episodes.findById(added.episode.id)).toEqual(added.episode)
+    expect(await repository.images.findByEpisodeId(added.episode.id)).toEqual([added.image])
+  })
+
+  it('存在しない作品へ話を追加しない', async () => {
+    const database = createTestDatabase()
+    const fixture = createDevelopmentComicFixture()
+    const service = createComicRegistrationService(database)
+
+    await expect(
+      service.addEpisodeToSeries({
+        registration: {
+          seriesId: 'unknown-series',
+          title: '第1話',
+          sourcePageUrl: 'https://example.com/unknown-series/episodes/1',
+        },
+        image: fixture.image,
+      }),
+    ).rejects.toThrow('追加先の作品が見つかりません')
+
+    expect(await database.series.count()).toBe(0)
+    expect(await database.episodes.count()).toBe(0)
+    expect(await database.images.count()).toBe(0)
+  })
+
+  it('追加する画像の保存に失敗した場合は作品の話数と保存済みデータを変えない', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const service = createComicRegistrationService(database, {
+      createId: () => 'failed-episode',
+    })
+
+    await repository.series.save(fixture.series)
+    await repository.episodes.save(fixture.episode)
+    await repository.images.save(fixture.image)
+
+    await expect(
+      service.addEpisodeToSeries({
+        registration: {
+          seriesId: fixture.series.id,
+          title: '失敗する話',
+          sourcePageUrl: 'https://example.com/development-series/episodes/failed',
+        },
+        image: { ...fixture.image, id: 'failed-image', width: 0 },
+      }),
+    ).rejects.toThrow()
+
+    expect(await repository.series.findById(fixture.series.id)).toEqual(fixture.series)
+    expect(await repository.episodes.findAll()).toEqual([fixture.episode])
+    expect(await repository.images.findByEpisodeId(fixture.episode.id)).toEqual([fixture.image])
+  })
+
   it('開発用画像のBlobを表示順に保存・読込する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)

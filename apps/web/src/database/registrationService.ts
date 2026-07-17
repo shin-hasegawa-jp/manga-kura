@@ -1,7 +1,9 @@
 import type { ComicImage, Episode, Series } from '@/domain/models'
 import {
+  type AddEpisodeToSeriesRegistration,
   type CreateSeriesRegistration,
   type CreateStandaloneEpisodeRegistration,
+  validateAddEpisodeToSeriesRegistration,
   validateCreateSeriesRegistration,
   validateCreateStandaloneEpisodeRegistration,
 } from '@/domain/registration'
@@ -23,6 +25,11 @@ export interface RegisterStandaloneEpisodeInput {
   image: RegistrationImage
 }
 
+export interface AddEpisodeToSeriesInput {
+  registration: AddEpisodeToSeriesRegistration
+  image: RegistrationImage
+}
+
 export interface RegisteredSeriesWithFirstEpisode {
   series: Series
   episode: Episode
@@ -30,6 +37,12 @@ export interface RegisteredSeriesWithFirstEpisode {
 }
 
 export interface RegisteredStandaloneEpisode {
+  episode: Episode
+  image: ComicImage
+}
+
+export interface AddedEpisodeToSeries {
+  series: Series
   episode: Episode
   image: ComicImage
 }
@@ -46,6 +59,7 @@ export interface ComicRegistrationService {
   registerStandaloneEpisode(
     input: RegisterStandaloneEpisodeInput,
   ): Promise<RegisteredStandaloneEpisode>
+  addEpisodeToSeries(input: AddEpisodeToSeriesInput): Promise<AddedEpisodeToSeries>
 }
 
 export function createComicRegistrationService(
@@ -121,6 +135,51 @@ export function createComicRegistrationService(
       })
 
       return { episode, image }
+    },
+    async addEpisodeToSeries(input) {
+      const registration = validateAddEpisodeToSeriesRegistration(input.registration)
+
+      return database.transaction(
+        'rw',
+        database.series,
+        database.episodes,
+        database.images,
+        async () => {
+          const existingSeries = await repository.series.findById(registration.seriesId)
+
+          if (existingSeries === undefined) {
+            throw new Error('追加先の作品が見つかりません')
+          }
+
+          const registeredAt = now()
+          const series: Series = {
+            ...existingSeries,
+            episodeCount: existingSeries.episodeCount + 1,
+            updatedAt: registeredAt,
+          }
+          const episode: Episode = {
+            id: createId(),
+            seriesId: series.id,
+            title: registration.title,
+            sourcePageUrl: registration.sourcePageUrl,
+            createdAt: registeredAt,
+            updatedAt: registeredAt,
+            scrollPosition: 0,
+            scrollProgress: 0,
+          }
+          const image: ComicImage = {
+            ...input.image,
+            episodeId: episode.id,
+            createdAt: registeredAt,
+          }
+
+          await repository.series.save(series)
+          await repository.episodes.save(episode)
+          await repository.images.save(image)
+
+          return { series, episode, image }
+        },
+      )
     },
   }
 }
