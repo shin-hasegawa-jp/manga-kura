@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DATABASE_NAME, DATABASE_VERSION, MangaKuraDatabase } from '../database'
@@ -77,5 +79,37 @@ describe('MangaKuraDatabase', () => {
     expect(await repository.episodes.findById(repeatedFixture.episode.id)).toEqual(
       repeatedFixture.episode,
     )
+  })
+
+  it('saves and reads development image blobs in display order', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const secondImage = {
+      ...fixture.image,
+      id: 'development-image-2',
+      displayOrder: 1,
+      sourceUrl: 'https://example.com/development-series/episodes/1/images/2.png',
+    }
+
+    await repository.images.save(secondImage)
+    await repository.images.save(fixture.image)
+
+    const images = await repository.images.findByEpisodeId(fixture.episode.id)
+
+    expect(images.map((image) => image.id)).toEqual([fixture.image.id, secondImage.id])
+    expect(images[0]).toMatchObject({
+      id: fixture.image.id,
+      episodeId: fixture.episode.id,
+      displayOrder: fixture.image.displayOrder,
+      sourceUrl: fixture.image.sourceUrl,
+      mimeType: fixture.image.mimeType,
+      fileSize: fixture.image.fileSize,
+      width: fixture.image.width,
+      height: fixture.image.height,
+      createdAt: fixture.image.createdAt,
+    })
+    expect(images[0]?.blob.type).toBe(fixture.image.blob.type)
+    expect(await images[0]?.blob.arrayBuffer()).toEqual(await fixture.image.blob.arrayBuffer())
   })
 })
