@@ -1,9 +1,10 @@
 import { ref } from 'vue'
+import type { RegistrationImage } from '@/database/registrationService'
 import {
   submitStandaloneEpisodeRegistration,
   type StandaloneEpisodeRegistrationSubmission,
 } from '@/views/saveStandaloneEpisodeRegistration'
-import { createFixedImageForRegistration, registrationService } from './registrationDependencies'
+import { registrationService } from './registrationDependencies'
 
 export function useStandaloneEpisodeRegistration() {
   const standaloneEpisodeTitle = ref('')
@@ -11,7 +12,7 @@ export function useStandaloneEpisodeRegistration() {
   const standaloneEpisodeSubmission = ref<StandaloneEpisodeRegistrationSubmission>()
   const isSubmittingStandaloneEpisode = ref(false)
 
-  async function registerStandaloneEpisode() {
+  async function registerStandaloneEpisode(images: readonly RegistrationImage[]) {
     isSubmittingStandaloneEpisode.value = true
 
     try {
@@ -21,11 +22,17 @@ export function useStandaloneEpisodeRegistration() {
           title: standaloneEpisodeTitle.value,
           sourcePageUrl: standaloneEpisodeSourcePageUrl.value,
         },
-        [createFixedImageForRegistration()],
+        images,
       )
+      return standaloneEpisodeSubmission.value
     } finally {
       isSubmittingStandaloneEpisode.value = false
     }
+  }
+
+  function resetStandaloneEpisodeFields() {
+    standaloneEpisodeTitle.value = ''
+    standaloneEpisodeSourcePageUrl.value = ''
   }
 
   function clearStandaloneEpisodeSubmission() {
@@ -38,6 +45,7 @@ export function useStandaloneEpisodeRegistration() {
     standaloneEpisodeSubmission,
     isSubmittingStandaloneEpisode,
     registerStandaloneEpisode,
+    resetStandaloneEpisodeFields,
     clearStandaloneEpisodeSubmission,
   }
 }

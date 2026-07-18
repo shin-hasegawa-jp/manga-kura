@@ -1,9 +1,10 @@
 import { ref } from 'vue'
+import type { RegistrationImage } from '@/database/registrationService'
 import {
   submitNewSeriesRegistration,
   type NewSeriesRegistrationSubmission,
 } from '@/views/saveNewSeriesRegistration'
-import { createFixedImageForRegistration, registrationService } from './registrationDependencies'
+import { registrationService } from './registrationDependencies'
 
 export function useNewSeriesRegistration() {
   const newSeriesTitle = ref('')
@@ -12,7 +13,7 @@ export function useNewSeriesRegistration() {
   const newSeriesSubmission = ref<NewSeriesRegistrationSubmission>()
   const isSubmittingNewSeries = ref(false)
 
-  async function registerNewSeries() {
+  async function registerNewSeries(images: readonly RegistrationImage[]) {
     isSubmittingNewSeries.value = true
 
     try {
@@ -23,11 +24,18 @@ export function useNewSeriesRegistration() {
           title: newSeriesEpisodeTitle.value,
           sourcePageUrl: newSeriesSourcePageUrl.value,
         },
-        [createFixedImageForRegistration()],
+        images,
       )
+      return newSeriesSubmission.value
     } finally {
       isSubmittingNewSeries.value = false
     }
+  }
+
+  function resetNewSeriesFields() {
+    newSeriesTitle.value = ''
+    newSeriesEpisodeTitle.value = ''
+    newSeriesSourcePageUrl.value = ''
   }
 
   function clearNewSeriesSubmission() {
@@ -41,6 +49,7 @@ export function useNewSeriesRegistration() {
     newSeriesSubmission,
     isSubmittingNewSeries,
     registerNewSeries,
+    resetNewSeriesFields,
     clearNewSeriesSubmission,
   }
 }

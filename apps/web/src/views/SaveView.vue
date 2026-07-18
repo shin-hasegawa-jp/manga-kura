@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useExistingSeriesEpisodeRegistration } from '@/composables/useExistingSeriesEpisodeRegistration'
 import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration'
 import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpisodeRegistration'
+import type { RegistrationImage } from '@/database/registrationService'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
 import { getImageCandidateListState } from './imageCandidateListState'
@@ -12,11 +13,14 @@ import {
   selectAllImageCandidates,
   toggleImageCandidateSelection,
 } from './imageCandidateSelection'
+import { saveAnalyzedPage, type AnalyzedPageRegistrationDetails } from './saveAnalyzedPage'
 import { registrationModeOptions, type RegistrationMode } from './saveRegistrationMode'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
 const pageUrl = ref('')
 const pageImageAnalysisState = ref<PageImageAnalysisState>()
+const isSavingAnalyzedPage = ref(false)
+const saveFlowError = ref('')
 const imageCandidateListState = computed(() =>
   getImageCandidateListState(pageImageAnalysisState.value),
 )
@@ -34,6 +38,7 @@ const {
   newSeriesSubmission,
   isSubmittingNewSeries,
   registerNewSeries,
+  resetNewSeriesFields,
   clearNewSeriesSubmission,
 } = useNewSeriesRegistration()
 const {
@@ -42,6 +47,7 @@ const {
   standaloneEpisodeSubmission,
   isSubmittingStandaloneEpisode,
   registerStandaloneEpisode,
+  resetStandaloneEpisodeFields,
   clearStandaloneEpisodeSubmission,
 } = useStandaloneEpisodeRegistration()
 const {
@@ -53,6 +59,7 @@ const {
   isSubmittingExistingSeriesEpisode,
   loadSeriesOptions,
   registerExistingSeriesEpisode,
+  resetExistingSeriesEpisodeFields,
   clearExistingSeriesEpisodeSubmission,
 } = useExistingSeriesEpisodeRegistration()
 
@@ -67,6 +74,74 @@ async function analyzePageUrl() {
 
   if (result.status === 'success' || result.status === 'empty') {
     pageUrl.value = result.pageUrl
+    newSeriesSourcePageUrl.value = result.pageUrl
+    standaloneEpisodeSourcePageUrl.value = result.pageUrl
+    existingSeriesEpisodeSourcePageUrl.value = result.pageUrl
+  }
+}
+
+function getCurrentRegistrationDetails(): AnalyzedPageRegistrationDetails {
+  switch (registrationMode.value) {
+    case 'newSeries':
+      return {
+        mode: 'newSeries',
+        seriesTitle: newSeriesTitle.value,
+        title: newSeriesEpisodeTitle.value,
+        sourcePageUrl: newSeriesSourcePageUrl.value,
+      }
+    case 'standaloneEpisode':
+      return {
+        mode: 'standaloneEpisode',
+        title: standaloneEpisodeTitle.value,
+        sourcePageUrl: standaloneEpisodeSourcePageUrl.value,
+      }
+    case 'existingSeries':
+      return {
+        mode: 'existingSeries',
+        seriesId: existingSeriesId.value,
+        title: existingSeriesEpisodeTitle.value,
+        sourcePageUrl: existingSeriesEpisodeSourcePageUrl.value,
+      }
+  }
+}
+
+function registerMode(mode: RegistrationMode, images: readonly RegistrationImage[]) {
+  switch (mode) {
+    case 'newSeries':
+      return registerNewSeries(images)
+    case 'standaloneEpisode':
+      return registerStandaloneEpisode(images)
+    case 'existingSeries':
+      return registerExistingSeriesEpisode(images)
+  }
+}
+
+async function saveCurrentRegistration() {
+  if (isSavingAnalyzedPage.value) {
+    return
+  }
+
+  isSavingAnalyzedPage.value = true
+  saveFlowError.value = ''
+
+  try {
+    const details = getCurrentRegistrationDetails()
+    const result = await saveAnalyzedPage(pageImageAnalysisState.value, details, {
+      register: (images) => registerMode(details.mode, images),
+    })
+
+    if (result.status === 'error') {
+      saveFlowError.value = result.message
+      return
+    }
+
+    pageUrl.value = ''
+    pageImageAnalysisState.value = undefined
+    resetNewSeriesFields()
+    resetStandaloneEpisodeFields()
+    resetExistingSeriesEpisodeFields()
+  } finally {
+    isSavingAnalyzedPage.value = false
   }
 }
 
@@ -97,10 +172,14 @@ function clearAllCandidateSelections() {
 }
 
 function selectRegistrationMode(mode: RegistrationMode) {
+  if (isSavingAnalyzedPage.value) {
+    return
+  }
   registrationMode.value = mode
   clearNewSeriesSubmission()
   clearStandaloneEpisodeSubmission()
   clearExistingSeriesEpisodeSubmission()
+  saveFlowError.value = ''
 
   if (mode === 'existingSeries') {
     void loadSeriesOptions()
@@ -233,6 +312,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
         class="registration-mode__button"
         :class="{ 'registration-mode__button--selected': registrationMode === option.value }"
         type="button"
+        :disabled="isSavingAnalyzedPage"
         :aria-pressed="registrationMode === option.value"
         @click="selectRegistrationMode(option.value)"
       >
@@ -244,7 +324,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
       v-if="registrationMode === 'newSeries'"
       class="registration-fields"
       aria-label="新規作品の入力項目"
-      @submit.prevent="registerNewSeries"
+      @submit.prevent="saveCurrentRegistration"
     >
       <label class="registration-fields__label">
         <span>作品名</span>
@@ -260,10 +340,10 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </label>
       <button
         class="registration-submit"
-        :disabled="isSubmittingNewSeries || !imageCandidateSelectionState.canSave"
+        :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
         type="submit"
       >
-        {{ isSubmittingNewSeries ? '登録中…' : '新規作品を登録' }}
+        {{ isSavingAnalyzedPage || isSubmittingNewSeries ? '保存中…' : '新規作品を登録' }}
       </button>
       <p
         v-if="newSeriesSubmission"
@@ -279,7 +359,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
       v-else-if="registrationMode === 'standaloneEpisode'"
       class="registration-fields"
       aria-label="単独の話の入力項目"
-      @submit.prevent="registerStandaloneEpisode"
+      @submit.prevent="saveCurrentRegistration"
     >
       <label class="registration-fields__label">
         <span>話タイトル</span>
@@ -291,10 +371,10 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </label>
       <button
         class="registration-submit"
-        :disabled="isSubmittingStandaloneEpisode || !imageCandidateSelectionState.canSave"
+        :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
         type="submit"
       >
-        {{ isSubmittingStandaloneEpisode ? '登録中…' : '単独の話を登録' }}
+        {{ isSavingAnalyzedPage || isSubmittingStandaloneEpisode ? '保存中…' : '単独の話を登録' }}
       </button>
       <p
         v-if="standaloneEpisodeSubmission"
@@ -310,7 +390,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
       v-else
       class="registration-fields"
       aria-label="既存作品への話追加の入力項目"
-      @submit.prevent="registerExistingSeriesEpisode"
+      @submit.prevent="saveCurrentRegistration"
     >
       <label class="registration-fields__label">
         <span>追加先作品</span>
@@ -331,10 +411,12 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </label>
       <button
         class="registration-submit"
-        :disabled="isSubmittingExistingSeriesEpisode || !imageCandidateSelectionState.canSave"
+        :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
         type="submit"
       >
-        {{ isSubmittingExistingSeriesEpisode ? '登録中…' : '作品へ話を追加' }}
+        {{
+          isSavingAnalyzedPage || isSubmittingExistingSeriesEpisode ? '保存中…' : '作品へ話を追加'
+        }}
       </button>
       <p
         v-if="existingSeriesEpisodeSubmission"
@@ -345,6 +427,10 @@ function selectRegistrationMode(mode: RegistrationMode) {
         {{ existingSeriesEpisodeSubmission.message }}
       </p>
     </form>
+
+    <p v-if="saveFlowError" class="registration-message registration-message--error" role="alert">
+      {{ saveFlowError }}
+    </p>
   </main>
 </template>
 
