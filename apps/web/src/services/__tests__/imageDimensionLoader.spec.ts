@@ -12,6 +12,7 @@ function createCandidate(id: string, imageUrl: string): ImageCandidate {
     score: 0,
     selectionReasons: [],
     fetchStatus: 'idle',
+    acquisitionMethod: 'direct',
   }
 }
 

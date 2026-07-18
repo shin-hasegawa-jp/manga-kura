@@ -19,6 +19,7 @@ function createCandidate(isSelected = true): ImageCandidate {
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus: 'loaded',
+    acquisitionMethod: 'direct',
     width: 800,
     height: 1200,
   }
@@ -80,6 +81,7 @@ const invalidSaveCases: InvalidSaveCase[] = [
     analysisState: {
       status: 'success',
       pageUrl: validDetails.sourcePageUrl,
+      acquisitionMethod: 'direct',
       candidates: [createCandidate(false)],
     },
     details: validDetails,
@@ -90,6 +92,7 @@ const invalidSaveCases: InvalidSaveCase[] = [
     analysisState: {
       status: 'success',
       pageUrl: validDetails.sourcePageUrl,
+      acquisitionMethod: 'direct',
       candidates: [createCandidate()],
     },
     details: { ...validDetails, seriesTitle: '' },
@@ -118,7 +121,12 @@ describe('解析済みページの保存フロー', () => {
 
     await expect(
       saveAnalyzedPage(
-        { status: 'success', pageUrl: validDetails.sourcePageUrl, candidates: [candidate] },
+        {
+          status: 'success',
+          pageUrl: validDetails.sourcePageUrl,
+          acquisitionMethod: 'direct',
+          candidates: [candidate],
+        },
         validDetails,
         dependencies,
       ),
@@ -141,7 +149,12 @@ describe('解析済みページの保存フロー', () => {
     )
 
     const result = await saveAnalyzedPage(
-      { status: 'success', pageUrl: validDetails.sourcePageUrl, candidates: [createCandidate()] },
+      {
+        status: 'success',
+        pageUrl: validDetails.sourcePageUrl,
+        acquisitionMethod: 'direct',
+        candidates: [createCandidate()],
+      },
       validDetails,
       dependencies,
     )

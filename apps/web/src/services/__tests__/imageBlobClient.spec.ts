@@ -16,6 +16,7 @@ function createCandidate(id: string, isSelected = true): ImageCandidate {
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus: 'loaded',
+    acquisitionMethod: 'direct',
     width: 800,
     height: 1200,
   }

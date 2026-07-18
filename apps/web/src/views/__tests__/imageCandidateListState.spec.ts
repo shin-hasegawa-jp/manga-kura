@@ -12,6 +12,7 @@ function createCandidate(fetchStatus: ImageCandidate['fetchStatus'] = 'loaded'):
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus,
+    acquisitionMethod: 'direct',
     width: fetchStatus === 'loaded' ? 800 : undefined,
     height: fetchStatus === 'loaded' ? 1200 : undefined,
   }
@@ -28,7 +29,11 @@ describe('画像候補一覧の表示状態', () => {
 
   it('候補が0件の場合は対象URLを持つ空状態を返す', () => {
     expect(
-      getImageCandidateListState({ status: 'empty', pageUrl: 'https://example.com/comic/' }),
+      getImageCandidateListState({
+        status: 'empty',
+        pageUrl: 'https://example.com/comic/',
+        acquisitionMethod: 'direct',
+      }),
     ).toEqual({
       kind: 'empty',
       pageUrl: 'https://example.com/comic/',
@@ -53,6 +58,7 @@ describe('画像候補一覧の表示状態', () => {
       getImageCandidateListState({
         status: 'success',
         pageUrl: 'https://example.com/comic/',
+        acquisitionMethod: 'direct',
         candidates,
       }),
     ).toEqual({

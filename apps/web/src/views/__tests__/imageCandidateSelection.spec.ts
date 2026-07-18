@@ -17,6 +17,7 @@ function createCandidate(id: string, isSelected = false): ImageCandidate {
     score: 0,
     selectionReasons: [],
     fetchStatus: 'loaded',
+    acquisitionMethod: 'direct',
     width: 800,
     height: 1200,
   }

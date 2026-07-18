@@ -3,6 +3,7 @@ import {
   type ImageSourceAttribute,
   type ImageSourceExtractorDependencies,
 } from './imageSourceExtractor'
+import type { ApiImageCandidate } from './acquisitionApiSchemas'
 
 export type ImageCandidateFetchStatus = 'idle' | 'loading' | 'loaded' | 'failed'
 
@@ -17,7 +18,7 @@ export type ImageCandidateSelectionReason =
   | 'decorative-filename'
   | 'image-load-failed'
 
-export interface ImageCandidate {
+interface ImageCandidateBase {
   id: string
   domOrder: number
   imageUrl: string
@@ -29,6 +30,9 @@ export interface ImageCandidate {
   width?: number
   height?: number
 }
+
+export type ImageCandidate = ImageCandidateBase &
+  ({ acquisitionMethod: 'direct' } | { acquisitionMethod: 'api'; proxyToken: string })
 
 export function createImageCandidates(
   html: string,
@@ -45,6 +49,20 @@ export function createImageCandidates(
       score: 0,
       selectionReasons: [],
       fetchStatus: 'idle',
+      acquisitionMethod: 'direct',
     }),
   )
+}
+
+export function createApiImageCandidates(
+  candidates: readonly ApiImageCandidate[],
+): ImageCandidate[] {
+  return candidates.map((candidate) => ({
+    ...candidate,
+    acquisitionMethod: 'api',
+    isSelected: false,
+    score: 0,
+    selectionReasons: [],
+    fetchStatus: 'idle',
+  }))
 }

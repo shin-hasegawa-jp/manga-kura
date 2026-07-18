@@ -37,6 +37,7 @@ export const acquisitionApiErrorResponseSchema = v.object({
 })
 
 export type PageAnalysisResponse = v.InferOutput<typeof pageAnalysisResponseSchema>
+export type ApiImageCandidate = v.InferOutput<typeof apiImageCandidateSchema>
 export type AcquisitionApiErrorResponse = v.InferOutput<typeof acquisitionApiErrorResponseSchema>
 
 export function parsePageAnalysisResponse(input: unknown): PageAnalysisResponse | undefined {

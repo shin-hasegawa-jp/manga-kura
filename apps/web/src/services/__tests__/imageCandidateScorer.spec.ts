@@ -21,6 +21,7 @@ function createCandidate(
     score: 0,
     selectionReasons: [],
     fetchStatus: 'loaded',
+    acquisitionMethod: 'direct',
     width,
     height,
   }

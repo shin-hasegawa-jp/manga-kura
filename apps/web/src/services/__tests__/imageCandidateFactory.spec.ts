@@ -19,6 +19,7 @@ describe('画像候補モデルの生成', () => {
         score: 0,
         selectionReasons: [],
         fetchStatus: 'idle',
+        acquisitionMethod: 'direct',
       },
       {
         id: 'image-candidate-1',
@@ -29,6 +30,7 @@ describe('画像候補モデルの生成', () => {
         score: 0,
         selectionReasons: [],
         fetchStatus: 'idle',
+        acquisitionMethod: 'direct',
       },
       {
         id: 'image-candidate-2',
@@ -39,6 +41,7 @@ describe('画像候補モデルの生成', () => {
         score: 0,
         selectionReasons: [],
         fetchStatus: 'idle',
+        acquisitionMethod: 'direct',
       },
     ])
   })
@@ -72,6 +75,7 @@ describe('画像候補モデルの生成', () => {
         score: 0,
         selectionReasons: [],
         fetchStatus: 'idle',
+        acquisitionMethod: 'direct',
       },
       {
         id: 'image-candidate-1',
@@ -82,6 +86,7 @@ describe('画像候補モデルの生成', () => {
         score: 0,
         selectionReasons: [],
         fetchStatus: 'idle',
+        acquisitionMethod: 'direct',
       },
     ])
   })

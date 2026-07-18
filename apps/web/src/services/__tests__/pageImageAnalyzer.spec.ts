@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageCandidate } from '../imageCandidateFactory'
+import { createApiImageCandidates } from '../imageCandidateFactory'
+import type { ApiImageCandidate } from '../acquisitionApiSchemas'
+import { PageHtmlFetchError } from '../pageHtmlClient'
 import type { PageUrlValidation } from '@/views/savePageUrlValidation'
 import {
   analyzePageImages,
@@ -17,6 +20,7 @@ function createCandidate(id: string, imageUrl: string): ImageCandidate {
     score: 0,
     selectionReasons: [],
     fetchStatus: 'idle',
+    acquisitionMethod: 'direct',
   }
 }
 
@@ -28,7 +32,9 @@ function createDependencies(
       (): PageUrlValidation => ({ status: 'valid', url: 'https://example.com/comic/' }),
     ),
     fetchHtml: vi.fn(async () => '<img src="page01.jpg">'),
+    analyzeViaApi: vi.fn(async () => ({ candidates: [] })),
     createCandidates: vi.fn(() => [createCandidate('0', 'https://example.com/comic/page01.jpg')]),
+    createApiCandidates: vi.fn(createApiImageCandidates),
     loadDimensions: vi.fn(
       async (candidates: readonly ImageCandidate[]): Promise<ImageCandidate[]> =>
         candidates.map((candidate) => ({
@@ -95,9 +101,11 @@ describe('ページ画像解析フロー', () => {
     ).resolves.toEqual({
       status: 'success',
       pageUrl: 'https://example.com/comic/',
+      acquisitionMethod: 'direct',
       candidates: [selectedCandidate],
     })
     expect(calls).toEqual(['validate', 'fetch', 'create', 'dimensions', 'score'])
+    expect(dependencies.analyzeViaApi).not.toHaveBeenCalled()
     expect(states.map(({ status }) => status)).toEqual(['analyzing', 'success'])
   })
 
@@ -107,7 +115,9 @@ describe('ページ画像解析フロー', () => {
     await expect(analyzePageImages('https://example.com/comic', dependencies)).resolves.toEqual({
       status: 'empty',
       pageUrl: 'https://example.com/comic/',
+      acquisitionMethod: 'direct',
     })
+    expect(dependencies.analyzeViaApi).not.toHaveBeenCalled()
     expect(dependencies.loadDimensions).not.toHaveBeenCalled()
     expect(dependencies.scoreCandidates).not.toHaveBeenCalled()
   })
@@ -125,13 +135,14 @@ describe('ページ画像解析フロー', () => {
       message: 'URLが不正です。',
     })
     expect(dependencies.fetchHtml).not.toHaveBeenCalled()
+    expect(dependencies.analyzeViaApi).not.toHaveBeenCalled()
     expect(dependencies.createCandidates).not.toHaveBeenCalled()
     expect(dependencies.loadDimensions).not.toHaveBeenCalled()
     expect(dependencies.scoreCandidates).not.toHaveBeenCalled()
   })
 
-  it('HTML取得失敗時は候補生成以降を実行しない', async () => {
-    const fetchError = new Error('CORSにより取得できません。')
+  it('フォールバック対象外のHTML取得失敗時は候補生成以降を実行しない', async () => {
+    const fetchError = new PageHtmlFetchError('http', '取得できません。', { status: 403 })
     const dependencies = createDependencies({
       fetchHtml: vi.fn().mockRejectedValue(fetchError),
     })
@@ -143,8 +154,92 @@ describe('ページ画像解析フロー', () => {
       cause: fetchError,
     })
     expect(dependencies.createCandidates).not.toHaveBeenCalled()
+    expect(dependencies.analyzeViaApi).not.toHaveBeenCalled()
     expect(dependencies.loadDimensions).not.toHaveBeenCalled()
     expect(dependencies.scoreCandidates).not.toHaveBeenCalled()
+  })
+
+  it('直接取得の通信失敗時だけ解析APIへ切り替える', async () => {
+    const calls: string[] = []
+    const apiCandidate: ApiImageCandidate = {
+      id: 'image-candidate-0',
+      domOrder: 0,
+      imageUrl: 'https://cdn.example.com/page01.jpg',
+      sourceAttribute: 'src',
+      proxyToken: 'signed-token',
+    }
+    const dependencies = createDependencies({
+      fetchHtml: vi.fn(async () => {
+        calls.push('direct')
+        throw new PageHtmlFetchError('network', 'CORSにより取得できません。')
+      }),
+      analyzeViaApi: vi.fn(async () => {
+        calls.push('api')
+        return { candidates: [apiCandidate] }
+      }),
+      createApiCandidates: vi.fn((candidates) => {
+        calls.push('convert')
+        return createApiImageCandidates(candidates)
+      }),
+      loadDimensions: vi.fn(async (candidates) => {
+        calls.push('dimensions')
+        return [...candidates]
+      }),
+      scoreCandidates: vi.fn((candidates) => {
+        calls.push('score')
+        return [...candidates]
+      }),
+    })
+
+    await expect(analyzePageImages('https://example.com/comic', dependencies)).resolves.toEqual({
+      status: 'success',
+      pageUrl: 'https://example.com/comic/',
+      acquisitionMethod: 'api',
+      candidates: [
+        expect.objectContaining({
+          id: 'image-candidate-0',
+          acquisitionMethod: 'api',
+          proxyToken: 'signed-token',
+        }),
+      ],
+    })
+    expect(calls).toEqual(['direct', 'api', 'convert', 'dimensions', 'score'])
+    expect(dependencies.fetchHtml).toHaveBeenCalledOnce()
+    expect(dependencies.analyzeViaApi).toHaveBeenCalledOnce()
+    expect(dependencies.createCandidates).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['Content-Type', new PageHtmlFetchError('unsupportedContentType', 'HTMLではありません。')],
+    ['HTTP', new PageHtmlFetchError('http', '取得失敗', { status: 403 })],
+  ])('直接取得の%sエラーでは解析APIへ切り替えない', async (_caseName, error) => {
+    const dependencies = createDependencies({
+      fetchHtml: vi.fn().mockRejectedValue(error),
+    })
+
+    await expect(analyzePageImages('https://example.com/comic', dependencies)).resolves.toEqual(
+      expect.objectContaining({ status: 'failure', kind: 'html-fetch-failed' }),
+    )
+    expect(dependencies.analyzeViaApi).not.toHaveBeenCalled()
+  })
+
+  it('解析API失敗時は再度の直接取得やAPI取得を行わない', async () => {
+    const apiError = new Error('解析APIに接続できません。')
+    const dependencies = createDependencies({
+      fetchHtml: vi
+        .fn()
+        .mockRejectedValue(new PageHtmlFetchError('network', '直接取得できません。')),
+      analyzeViaApi: vi.fn().mockRejectedValue(apiError),
+    })
+
+    await expect(analyzePageImages('https://example.com/comic', dependencies)).resolves.toEqual({
+      status: 'failure',
+      kind: 'html-fetch-failed',
+      message: apiError.message,
+      cause: apiError,
+    })
+    expect(dependencies.fetchHtml).toHaveBeenCalledOnce()
+    expect(dependencies.analyzeViaApi).toHaveBeenCalledOnce()
   })
 
   it('サイズ取得失敗時はスコア処理を実行しない', async () => {
