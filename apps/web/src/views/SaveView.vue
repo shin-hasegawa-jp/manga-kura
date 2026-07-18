@@ -1,19 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useExistingSeriesEpisodeRegistration } from '@/composables/useExistingSeriesEpisodeRegistration'
 import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration'
-import { usePageUrlValidation } from '@/composables/usePageUrlValidation'
 import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpisodeRegistration'
+import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
+import { getImageCandidateListState } from './imageCandidateListState'
 import { registrationModeOptions, type RegistrationMode } from './saveRegistrationMode'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
-const {
-  pageUrl,
-  validatedPageUrl,
-  pageUrlSubmission,
-  isValidatingPageUrl,
-  validatePageUrlForAnalysis,
-} = usePageUrlValidation()
+const pageUrl = ref('')
+const pageImageAnalysisState = ref<PageImageAnalysisState>()
+const imageCandidateListState = computed(() =>
+  getImageCandidateListState(pageImageAnalysisState.value),
+)
 const {
   newSeriesTitle,
   newSeriesEpisodeTitle,
@@ -43,6 +42,20 @@ const {
   clearExistingSeriesEpisodeSubmission,
 } = useExistingSeriesEpisodeRegistration()
 
+async function analyzePageUrl() {
+  if (pageImageAnalysisState.value?.status === 'analyzing') {
+    return
+  }
+
+  const result = await analyzePageImages(pageUrl.value, undefined, (state) => {
+    pageImageAnalysisState.value = state
+  })
+
+  if (result.status === 'success' || result.status === 'empty') {
+    pageUrl.value = result.pageUrl
+  }
+}
+
 function selectRegistrationMode(mode: RegistrationMode) {
   registrationMode.value = mode
   clearNewSeriesSubmission()
@@ -62,7 +75,8 @@ function selectRegistrationMode(mode: RegistrationMode) {
     <form
       class="page-url-form"
       aria-label="取得元ページURL"
-      @submit.prevent="validatePageUrlForAnalysis"
+      :aria-busy="imageCandidateListState.kind === 'loading'"
+      @submit.prevent="analyzePageUrl"
     >
       <label class="registration-fields__label">
         <span>取得元ページURL</span>
@@ -73,24 +87,74 @@ function selectRegistrationMode(mode: RegistrationMode) {
           inputmode="url"
           autocomplete="url"
           placeholder="https://example.com/comic/1"
-          :aria-invalid="pageUrlSubmission?.status === 'error'"
-          :aria-describedby="pageUrlSubmission ? 'page-url-message' : undefined"
+          :aria-invalid="imageCandidateListState.kind === 'failure'"
+          :aria-describedby="
+            imageCandidateListState.kind === 'failure' ? 'page-url-message' : undefined
+          "
         />
       </label>
-      <button class="registration-submit" :disabled="isValidatingPageUrl" type="submit">
-        {{ isValidatingPageUrl ? '確認中…' : 'URLを確認' }}
+      <button
+        class="registration-submit"
+        :disabled="imageCandidateListState.kind === 'loading'"
+        type="submit"
+      >
+        {{ imageCandidateListState.kind === 'loading' ? '解析中…' : '画像を解析' }}
       </button>
       <p
-        v-if="pageUrlSubmission"
+        v-if="imageCandidateListState.kind === 'failure'"
         id="page-url-message"
-        class="registration-message"
-        :class="`registration-message--${pageUrlSubmission.status}`"
-        :role="pageUrlSubmission.status === 'error' ? 'alert' : 'status'"
+        class="registration-message registration-message--error"
+        role="alert"
       >
-        {{ pageUrlSubmission.message }}
+        {{ imageCandidateListState.message }}
       </p>
-      <p v-if="validatedPageUrl" class="validated-url">{{ validatedPageUrl }}</p>
     </form>
+
+    <section
+      v-if="imageCandidateListState.kind !== 'idle'"
+      class="image-candidates"
+      aria-labelledby="image-candidates-heading"
+    >
+      <div class="image-candidates__heading">
+        <h2 id="image-candidates-heading">画像候補</h2>
+        <span v-if="imageCandidateListState.kind === 'populated'">
+          {{ imageCandidateListState.candidates.length }}件
+        </span>
+      </div>
+
+      <p v-if="imageCandidateListState.kind === 'loading'" role="status">
+        ページから画像候補を解析しています…
+      </p>
+      <p v-else-if="imageCandidateListState.kind === 'empty'" class="image-candidates__empty">
+        このページから画像候補を抽出できませんでした。
+      </p>
+      <ul v-else-if="imageCandidateListState.kind === 'populated'" class="image-candidate-list">
+        <li
+          v-for="candidate in imageCandidateListState.candidates"
+          :key="candidate.id"
+          class="image-candidate"
+          :class="{ 'image-candidate--failed': candidate.fetchStatus === 'failed' }"
+        >
+          <img
+            v-if="candidate.fetchStatus !== 'failed'"
+            class="image-candidate__preview"
+            :src="candidate.imageUrl"
+            :alt="`画像候補 ${candidate.domOrder + 1}`"
+          />
+          <div v-else class="image-candidate__preview image-candidate__preview--failed">
+            読込失敗
+          </div>
+          <div class="image-candidate__details">
+            <strong>候補 {{ candidate.domOrder + 1 }}</strong>
+            <span v-if="candidate.width !== undefined && candidate.height !== undefined">
+              {{ candidate.width }} × {{ candidate.height }} px
+            </span>
+            <span v-else>サイズ取得不可</span>
+            <span>{{ candidate.isSelected ? '選択済み' : '未選択' }}</span>
+          </div>
+        </li>
+      </ul>
+    </section>
 
     <p class="save-view__description">保存する話の登録方法を選択してください。</p>
 
@@ -223,6 +287,11 @@ h1 {
   font-size: 1.5rem;
 }
 
+h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
 .save-view__description {
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
@@ -342,6 +411,73 @@ h1 {
 .validated-url {
   overflow-wrap: anywhere;
   color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.8125rem;
+}
+
+.image-candidates {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 0.5rem;
+}
+
+.image-candidates__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.image-candidates__empty {
+  padding: 1rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  text-align: center;
+  background: rgba(var(--v-theme-on-surface), 5%);
+  border-radius: 0.5rem;
+}
+
+.image-candidate-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.image-candidate {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.5rem;
+  background: rgb(var(--v-theme-surface));
+  border: 0.125rem solid transparent;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 1px rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.image-candidate--failed {
+  border-color: #b91c1c;
+}
+
+.image-candidate__preview {
+  width: 100%;
+  height: 12rem;
+  object-fit: contain;
+  background: rgba(var(--v-theme-on-surface), 5%);
+  border-radius: 0.25rem;
+}
+
+.image-candidate__preview--failed {
+  display: grid;
+  place-items: center;
+  color: #7f1d1d;
+  font-weight: 700;
+}
+
+.image-candidate__details {
+  display: grid;
+  gap: 0.125rem;
   font-size: 0.8125rem;
 }
 </style>
