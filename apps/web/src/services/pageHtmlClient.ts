@@ -27,6 +27,10 @@ export interface PageHtmlClientDependencies {
   fetch: typeof fetch
 }
 
+const defaultDependencies: PageHtmlClientDependencies = {
+  fetch: (input, init) => globalThis.fetch(input, init),
+}
+
 function isHtmlContentType(contentType: string): boolean {
   const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase()
 
@@ -35,7 +39,7 @@ function isHtmlContentType(contentType: string): boolean {
 
 export async function fetchPageHtml(
   url: string,
-  dependencies: PageHtmlClientDependencies = { fetch },
+  dependencies: PageHtmlClientDependencies = defaultDependencies,
 ): Promise<string> {
   let response: Response
 

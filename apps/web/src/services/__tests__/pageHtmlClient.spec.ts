@@ -1,7 +1,24 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fetchPageHtml } from '../pageHtmlClient'
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('FrontendからのHTML取得', () => {
+  it('デフォルトのfetchをWindowコンテキストで呼び出す', async () => {
+    const fetchStub = vi.fn(function (this: unknown) {
+      expect(this).toBe(globalThis)
+      return Promise.resolve(
+        new Response('<html></html>', { headers: { 'content-type': 'text/html' } }),
+      )
+    })
+    vi.stubGlobal('fetch', fetchStub)
+
+    await expect(fetchPageHtml('https://example.com/comic/1')).resolves.toBe('<html></html>')
+    expect(fetchStub).toHaveBeenCalledOnce()
+  })
+
   it.each(['text/html', 'text/html; charset=utf-8', 'application/xhtml+xml'])(
     'HTMLのContent-Typeでは本文を返す: %s',
     async (contentType) => {

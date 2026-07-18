@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageCandidate } from '../imageCandidateFactory'
 import { fetchImageBlob, fetchSelectedImageBlobs, ImageBlobFetchError } from '../imageBlobClient'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 function createCandidate(id: string, isSelected = true): ImageCandidate {
   return {
@@ -18,6 +22,20 @@ function createCandidate(id: string, isSelected = true): ImageCandidate {
 }
 
 describe('選択画像のBlob取得', () => {
+  it('デフォルトのfetchをWindowコンテキストで呼び出す', async () => {
+    const candidate = createCandidate('1')
+    const fetchStub = vi.fn(function (this: unknown) {
+      expect(this).toBe(globalThis)
+      return Promise.resolve(
+        new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }),
+      )
+    })
+    vi.stubGlobal('fetch', fetchStub)
+
+    await expect(fetchImageBlob(candidate)).resolves.toMatchObject({ candidateId: candidate.id })
+    expect(fetchStub).toHaveBeenCalledOnce()
+  })
+
   it('画像Blobと保存用メタデータを返す', async () => {
     const candidate = createCandidate('1')
     const bytes = new Uint8Array([1, 2, 3, 4])

@@ -55,6 +55,10 @@ export interface ImageBlobClientDependencies {
   fetch: typeof fetch
 }
 
+const defaultDependencies: ImageBlobClientDependencies = {
+  fetch: (input, init) => globalThis.fetch(input, init),
+}
+
 function getImageMediaType(contentType: string): string | undefined {
   const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase()
   return mediaType?.startsWith('image/') ? mediaType : undefined
@@ -62,7 +66,7 @@ function getImageMediaType(contentType: string): string | undefined {
 
 export async function fetchImageBlob(
   candidate: ImageCandidate,
-  dependencies: ImageBlobClientDependencies = { fetch },
+  dependencies: ImageBlobClientDependencies = defaultDependencies,
 ): Promise<FetchedImageBlob> {
   if (candidate.width === undefined || candidate.height === undefined) {
     throw new ImageBlobFetchError('missingDimensions', '画像の幅と高さを取得できませんでした。', {
@@ -132,7 +136,7 @@ export async function fetchImageBlob(
 
 export async function fetchSelectedImageBlobs(
   candidates: readonly ImageCandidate[],
-  dependencies: ImageBlobClientDependencies = { fetch },
+  dependencies: ImageBlobClientDependencies = defaultDependencies,
 ): Promise<ImageBlobBatchFetchResult> {
   const selectedCandidates = candidates.filter(({ isSelected }) => isSelected)
   const results = await Promise.all(
