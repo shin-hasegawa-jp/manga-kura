@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     max_redirects: int = Field(default=5, ge=0)
     max_response_header_bytes: int = Field(default=65536, gt=0)
     max_html_bytes: int = Field(default=5242880, gt=0)
+    max_image_count: int = Field(default=100, gt=0)
+    proxy_token_ttl_seconds: int = Field(default=900, gt=0)
+    proxy_token_secret: SecretStr = SecretStr("local-development-only-change-me")
 
     @property
     def parsed_cors_origins(self) -> tuple[str, ...]:

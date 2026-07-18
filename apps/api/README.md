@@ -195,6 +195,7 @@ ApiErrorResponse
 | `API_MAX_IMAGE_COUNT` | `100` | 1解析・保存の最大画像数 |
 | `API_MAX_TOTAL_IMAGE_BYTES` | `209715200` | 1保存の合計最大200 MiB |
 | `API_PROXY_TOKEN_TTL_SECONDS` | `900` | 中継トークン有効期間15分 |
+| `API_PROXY_TOKEN_SECRET` | `local-development-only-change-me` | HMAC署名鍵。本番では長いランダム値へ必ず変更 |
 | `API_RATE_LIMIT_REQUESTS` | `30` | 制限期間内のクライアント別上限 |
 | `API_RATE_LIMIT_WINDOW_SECONDS` | `60` | レート制限期間 |
 | `API_DOMAIN_INTERVAL_SECONDS` | `1` | 同一ドメインへの最小アクセス間隔 |
