@@ -9,6 +9,8 @@ function createCandidate(id: string, imageUrl: string): ImageCandidate {
     imageUrl,
     sourceAttribute: 'src',
     isSelected: false,
+    score: 0,
+    selectionReasons: [],
     fetchStatus: 'idle',
   }
 }

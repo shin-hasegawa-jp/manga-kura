@@ -16,6 +16,8 @@ describe('画像候補モデルの生成', () => {
         imageUrl: 'https://example.com/images/page-01.jpg',
         sourceAttribute: 'src',
         isSelected: false,
+        score: 0,
+        selectionReasons: [],
         fetchStatus: 'idle',
       },
       {
@@ -24,6 +26,8 @@ describe('画像候補モデルの生成', () => {
         imageUrl: 'https://example.com/images/page-02.jpg',
         sourceAttribute: 'data-src',
         isSelected: false,
+        score: 0,
+        selectionReasons: [],
         fetchStatus: 'idle',
       },
       {
@@ -32,6 +36,8 @@ describe('画像候補モデルの生成', () => {
         imageUrl: 'https://example.com/images/page-03@2x.jpg',
         sourceAttribute: 'srcset',
         isSelected: false,
+        score: 0,
+        selectionReasons: [],
         fetchStatus: 'idle',
       },
     ])
@@ -63,6 +69,8 @@ describe('画像候補モデルの生成', () => {
         imageUrl: 'https://example.com/images/page-01.jpg',
         sourceAttribute: 'src',
         isSelected: false,
+        score: 0,
+        selectionReasons: [],
         fetchStatus: 'idle',
       },
       {
@@ -71,6 +79,8 @@ describe('画像候補モデルの生成', () => {
         imageUrl: 'https://example.com/images/page-02.jpg',
         sourceAttribute: 'data-original',
         isSelected: false,
+        score: 0,
+        selectionReasons: [],
         fetchStatus: 'idle',
       },
     ])
