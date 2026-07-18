@@ -23,6 +23,7 @@ class UrlRequest(BaseModel):
         (ApiErrorCode.UPSTREAM_NETWORK_ERROR, 502, True),
         (ApiErrorCode.UPSTREAM_TIMEOUT, 504, True),
         (ApiErrorCode.UNSUPPORTED_CONTENT_TYPE, 415, False),
+        (ApiErrorCode.UNSUPPORTED_CHARACTER_ENCODING, 502, False),
         (ApiErrorCode.RESPONSE_TOO_LARGE, 413, False),
         (ApiErrorCode.TOO_MANY_CANDIDATES, 422, False),
         (ApiErrorCode.INVALID_PROXY_TOKEN, 400, False),

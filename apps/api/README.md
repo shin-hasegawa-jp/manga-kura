@@ -176,7 +176,7 @@ ApiErrorResponse
 - error: ApiErrorDetail
 ```
 
-エラーコードは少なくとも`invalid_url`、`forbidden_destination`、`upstream_http_error`、`upstream_network_error`、`upstream_timeout`、`unsupported_content_type`、`response_too_large`、`too_many_candidates`、`invalid_proxy_token`、`rate_limited`、`internal_error`を定義します。
+エラーコードは少なくとも`invalid_url`、`forbidden_destination`、`upstream_http_error`、`upstream_network_error`、`upstream_timeout`、`unsupported_content_type`、`unsupported_character_encoding`、`response_too_large`、`too_many_candidates`、`invalid_proxy_token`、`rate_limited`、`internal_error`を定義します。
 
 ## 設定と上限値
 

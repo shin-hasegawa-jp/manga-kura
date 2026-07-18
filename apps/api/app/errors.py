@@ -9,6 +9,7 @@ class ApiErrorCode(StrEnum):
     UPSTREAM_NETWORK_ERROR = "upstream_network_error"
     UPSTREAM_TIMEOUT = "upstream_timeout"
     UNSUPPORTED_CONTENT_TYPE = "unsupported_content_type"
+    UNSUPPORTED_CHARACTER_ENCODING = "unsupported_character_encoding"
     RESPONSE_TOO_LARGE = "response_too_large"
     TOO_MANY_CANDIDATES = "too_many_candidates"
     INVALID_PROXY_TOKEN = "invalid_proxy_token"
@@ -41,6 +42,9 @@ ERROR_DEFINITIONS: dict[ApiErrorCode, ErrorDefinition] = {
     ),
     ApiErrorCode.UNSUPPORTED_CONTENT_TYPE: ErrorDefinition(
         415, "対応していないContent-Typeです。", False
+    ),
+    ApiErrorCode.UNSUPPORTED_CHARACTER_ENCODING: ErrorDefinition(
+        502, "取得したHTMLの文字コードを解釈できません。", False
     ),
     ApiErrorCode.RESPONSE_TOO_LARGE: ErrorDefinition(
         413, "取得データが許可された上限を超えています。", False
