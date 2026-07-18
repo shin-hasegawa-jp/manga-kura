@@ -654,4 +654,138 @@ describe('MangaKuraDatabase', () => {
     expect(images[0]?.blob.type).toBe(fixture.image.blob.type)
     expect(await images[0]?.blob.arrayBuffer()).toEqual(await fixture.image.blob.arrayBuffer())
   })
+
+  it('保存した話と複数画像を一覧へ反映し、DB再接続後もBlobとメタデータを維持する', async () => {
+    const database = createTestDatabase()
+    const fixture = createDevelopmentComicFixture()
+    const registeredAt = new Date('2026-07-18T06:00:00.000Z')
+    const service = createComicRegistrationService(database, {
+      createId: () => 'persisted-episode',
+      now: () => registeredAt,
+    })
+    const firstImage = {
+      ...fixture.image,
+      id: 'persisted-image-1',
+      displayOrder: 12,
+      sourceUrl: 'https://cdn.example.com/comic/page01.png',
+      width: 800,
+      height: 1200,
+    }
+    const secondImageBytes = new Uint8Array([10, 20, 30, 40])
+    const secondImage = {
+      ...fixture.image,
+      id: 'persisted-image-2',
+      displayOrder: 3,
+      blob: new Blob([secondImageBytes], { type: 'image/webp' }),
+      sourceUrl: 'https://cdn.example.com/comic/page02.webp',
+      mimeType: 'image/webp',
+      fileSize: secondImageBytes.byteLength,
+      width: 900,
+      height: 1400,
+    }
+
+    const registered = await service.registerStandaloneEpisode({
+      registration: {
+        title: 'Frontend取得で保存した話',
+        sourcePageUrl: 'https://example.com/comic/reader',
+      },
+      images: [firstImage, secondImage],
+    })
+    const repository = createMangaRepository(database)
+
+    expect(await repository.topLevelLibrary.findAll()).toEqual([
+      {
+        kind: 'standaloneEpisode',
+        episode: registered.episode,
+        thumbnailImage: registered.images[0],
+      },
+    ])
+    expect(
+      (await repository.images.findByEpisodeId(registered.episode.id)).map(
+        ({ id, displayOrder }) => ({ id, displayOrder }),
+      ),
+    ).toEqual([
+      { id: 'persisted-image-1', displayOrder: 0 },
+      { id: 'persisted-image-2', displayOrder: 1 },
+    ])
+
+    database.close()
+    const reopenedDatabase = new MangaKuraDatabase(database.name)
+    const reopenedRepository = createMangaRepository(reopenedDatabase)
+    const persistedEpisode = await reopenedRepository.episodes.findById(registered.episode.id)
+    const persistedImages = await reopenedRepository.images.findByEpisodeId(registered.episode.id)
+
+    expect(persistedEpisode).toEqual(registered.episode)
+    expect(
+      persistedImages.map(
+        ({ id, displayOrder, sourceUrl, mimeType, fileSize, width, height, createdAt }) => ({
+          id,
+          displayOrder,
+          sourceUrl,
+          mimeType,
+          fileSize,
+          width,
+          height,
+          createdAt,
+        }),
+      ),
+    ).toEqual(
+      registered.images.map(
+        ({ id, displayOrder, sourceUrl, mimeType, fileSize, width, height, createdAt }) => ({
+          id,
+          displayOrder,
+          sourceUrl,
+          mimeType,
+          fileSize,
+          width,
+          height,
+          createdAt,
+        }),
+      ),
+    )
+    const persistedFirstImage = persistedImages.find(({ id }) => id === 'persisted-image-1')
+    const persistedSecondImage = persistedImages.find(({ id }) => id === 'persisted-image-2')
+    if (persistedFirstImage === undefined || persistedSecondImage === undefined) {
+      throw new Error('再接続後の画像が不足しています')
+    }
+
+    expect(await persistedFirstImage.blob.arrayBuffer()).toEqual(
+      await firstImage.blob.arrayBuffer(),
+    )
+    expect(new Uint8Array(await persistedSecondImage.blob.arrayBuffer())).toEqual(secondImageBytes)
+    expect(persistedImages.map(({ blob }) => blob.type)).toEqual(['image/png', 'image/webp'])
+    reopenedDatabase.close()
+  })
+
+  it('同じ元ページURLの再保存は現時点では別の話として重複登録する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const identifiers = ['duplicate-episode-1', 'duplicate-episode-2']
+    const service = createComicRegistrationService(database, {
+      createId: () => identifiers.shift() ?? 'unexpected-episode-id',
+    })
+    const sourcePageUrl = 'https://example.com/comic/same-source'
+
+    await service.registerStandaloneEpisode({
+      registration: { title: '最初の保存', sourcePageUrl },
+      images: [{ ...fixture.image, id: 'duplicate-image-1' }],
+    })
+    await service.registerStandaloneEpisode({
+      registration: { title: '再保存', sourcePageUrl },
+      images: [{ ...fixture.image, id: 'duplicate-image-2' }],
+    })
+
+    const episodesWithSameSource = (await repository.episodes.findAll()).filter(
+      (episode) => episode.sourcePageUrl === sourcePageUrl,
+    )
+    const libraryEntries = await repository.topLevelLibrary.findAll()
+
+    expect(episodesWithSameSource.map(({ id }) => id)).toEqual([
+      'duplicate-episode-1',
+      'duplicate-episode-2',
+    ])
+    expect(libraryEntries).toHaveLength(2)
+    expect(libraryEntries.every(({ kind }) => kind === 'standaloneEpisode')).toBe(true)
+  })
 })
