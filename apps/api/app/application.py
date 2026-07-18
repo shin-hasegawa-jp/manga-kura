@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.health import router as health_router
 from app.api.routes.images import router as images_router
@@ -19,6 +20,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application = FastAPI(
         title=resolved_settings.app_name,
         version=resolved_settings.app_version,
+    )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(resolved_settings.parsed_cors_origins),
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+        allow_credentials=False,
     )
     application.dependency_overrides[get_settings] = lambda: resolved_settings
     domain_limiter = DomainAccessLimiter(resolved_settings.domain_interval_seconds)
