@@ -1,6 +1,3 @@
-def main():
-    print("Hello from api!")
+from app.application import create_app
 
-
-if __name__ == "__main__":
-    main()
+app = create_app()
