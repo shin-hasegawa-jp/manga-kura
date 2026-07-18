@@ -4,7 +4,11 @@ import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DATABASE_NAME, DATABASE_VERSION, MangaKuraDatabase } from '../database'
 import { createDevelopmentComicFixture } from '../developmentComicFixture'
-import { createComicRegistrationService, createRegistrationId } from '../registrationService'
+import {
+  createComicRegistrationService,
+  createRegistrationId,
+  createRegistrationImages,
+} from '../registrationService'
 import { createMangaRepository } from '../repository'
 
 const databases: MangaKuraDatabase[] = []
@@ -33,6 +37,36 @@ describe('MangaKuraDatabase', () => {
     expect(createRegistrationId()).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     )
+  })
+
+  it('取得済み画像群へIDと選択順の表示順を割り当てる', () => {
+    const fixture = createDevelopmentComicFixture()
+    const identifiers = ['fetched-image-1', 'fetched-image-2']
+    const images = createRegistrationImages(
+      [
+        fixture.image,
+        {
+          ...fixture.image,
+          sourceUrl: 'https://example.com/images/page02.png',
+        },
+      ],
+      () => identifiers.shift() ?? 'unexpected-image-id',
+    )
+
+    expect(
+      images.map(({ id, displayOrder, sourceUrl }) => ({ id, displayOrder, sourceUrl })),
+    ).toEqual([
+      {
+        id: 'fetched-image-1',
+        displayOrder: 0,
+        sourceUrl: fixture.image.sourceUrl,
+      },
+      {
+        id: 'fetched-image-2',
+        displayOrder: 1,
+        sourceUrl: 'https://example.com/images/page02.png',
+      },
+    ])
   })
 
   it('必要なストア、主キー、インデックスを定義する', async () => {
@@ -327,7 +361,7 @@ describe('MangaKuraDatabase', () => {
     expect(await repository.seriesDetails.findBySeriesId('unknown-series')).toBeUndefined()
   })
 
-  it('新規作品と最初の話と固定画像を同じトランザクションで保存する', async () => {
+  it('新規作品と最初の話と複数画像を同じトランザクションで保存する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)
     const fixture = createDevelopmentComicFixture()
@@ -346,13 +380,19 @@ describe('MangaKuraDatabase', () => {
       now: () => registeredAt,
     })
 
+    const secondImage = {
+      ...fixture.image,
+      id: 'new-series-image-2',
+      displayOrder: 99,
+      sourceUrl: 'https://example.com/new-series/episodes/1/images/2.png',
+    }
     const registered = await service.registerSeriesWithFirstEpisode({
       registration: {
         seriesTitle: '新規作品',
         title: '第1話',
         sourcePageUrl: 'https://example.com/new-series/episodes/1',
       },
-      image: fixture.image,
+      images: [secondImage, fixture.image],
     })
 
     expect(registered.series).toEqual({
@@ -372,15 +412,24 @@ describe('MangaKuraDatabase', () => {
       scrollPosition: 0,
       scrollProgress: 0,
     })
-    expect(registered.image).toEqual({
-      ...fixture.image,
-      episodeId: 'episode-1',
-      createdAt: registeredAt,
-    })
+    expect(registered.images).toEqual([
+      {
+        ...secondImage,
+        displayOrder: 0,
+        episodeId: 'episode-1',
+        createdAt: registeredAt,
+      },
+      {
+        ...fixture.image,
+        displayOrder: 1,
+        episodeId: 'episode-1',
+        createdAt: registeredAt,
+      },
+    ])
     expect(await repository.series.findById(registered.series.id)).toEqual(registered.series)
     expect(await repository.episodes.findById(registered.episode.id)).toEqual(registered.episode)
     expect(await repository.images.findByEpisodeId(registered.episode.id)).toEqual([
-      registered.image,
+      ...registered.images,
     ])
   })
 
@@ -407,7 +456,7 @@ describe('MangaKuraDatabase', () => {
           title: '第1話',
           sourcePageUrl: 'https://example.com/rollback/episodes/1',
         },
-        image: { ...fixture.image, width: 0 },
+        images: [fixture.image, { ...fixture.image, id: 'invalid-image', width: 0 }],
       }),
     ).rejects.toThrow()
 
@@ -416,7 +465,7 @@ describe('MangaKuraDatabase', () => {
     expect(await database.images.count()).toBe(0)
   })
 
-  it('単独の話と固定画像を保存し、作品一覧を経由せずに読込できる', async () => {
+  it('単独の話と複数画像を保存し、作品一覧を経由せずに読込できる', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)
     const fixture = createDevelopmentComicFixture()
@@ -426,12 +475,17 @@ describe('MangaKuraDatabase', () => {
       now: () => registeredAt,
     })
 
+    const secondImage = {
+      ...fixture.image,
+      id: 'standalone-image-2',
+      sourceUrl: 'https://example.com/standalone-episodes/1/images/2.png',
+    }
     const registered = await service.registerStandaloneEpisode({
       registration: {
         title: '単独の話',
         sourcePageUrl: 'https://example.com/standalone-episodes/1',
       },
-      image: fixture.image,
+      images: [fixture.image, secondImage],
     })
 
     expect(await database.series.count()).toBe(0)
@@ -445,12 +499,33 @@ describe('MangaKuraDatabase', () => {
       scrollProgress: 0,
     })
     expect(await repository.episodes.findById(registered.episode.id)).toEqual(registered.episode)
-    expect(await repository.images.findByEpisodeId(registered.episode.id)).toEqual([
-      registered.image,
-    ])
+    expect(await repository.images.findByEpisodeId(registered.episode.id)).toEqual(
+      registered.images,
+    )
   })
 
-  it('既存作品へ話と固定画像を追加し、話数を更新する', async () => {
+  it('単独の話で途中の画像保存に失敗した場合は話と画像を残さない', async () => {
+    const database = createTestDatabase()
+    const fixture = createDevelopmentComicFixture()
+    const service = createComicRegistrationService(database, {
+      createId: () => 'failed-standalone-episode',
+    })
+
+    await expect(
+      service.registerStandaloneEpisode({
+        registration: {
+          title: '保存に失敗する単独の話',
+          sourcePageUrl: 'https://example.com/standalone-episodes/failed',
+        },
+        images: [fixture.image, { ...fixture.image, id: 'invalid-second-image', height: 0 }],
+      }),
+    ).rejects.toThrow()
+
+    expect(await database.episodes.count()).toBe(0)
+    expect(await database.images.count()).toBe(0)
+  })
+
+  it('既存作品へ話と複数画像を追加し、話数を更新する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)
     const fixture = createDevelopmentComicFixture()
@@ -462,13 +537,18 @@ describe('MangaKuraDatabase', () => {
 
     await repository.series.save(fixture.series)
 
+    const secondImage = {
+      ...fixture.image,
+      id: 'development-image-3',
+      sourceUrl: 'https://example.com/development-series/episodes/2/images/2.png',
+    }
     const added = await service.addEpisodeToSeries({
       registration: {
         seriesId: fixture.series.id,
         title: '第2話',
         sourcePageUrl: 'https://example.com/development-series/episodes/2',
       },
-      image: { ...fixture.image, id: 'development-image-2' },
+      images: [{ ...fixture.image, id: 'development-image-2' }, secondImage],
     })
 
     expect(added.series).toEqual({
@@ -488,7 +568,7 @@ describe('MangaKuraDatabase', () => {
     })
     expect(await repository.series.findById(fixture.series.id)).toEqual(added.series)
     expect(await repository.episodes.findById(added.episode.id)).toEqual(added.episode)
-    expect(await repository.images.findByEpisodeId(added.episode.id)).toEqual([added.image])
+    expect(await repository.images.findByEpisodeId(added.episode.id)).toEqual(added.images)
   })
 
   it('存在しない作品へ話を追加しない', async () => {
@@ -503,7 +583,7 @@ describe('MangaKuraDatabase', () => {
           title: '第1話',
           sourcePageUrl: 'https://example.com/unknown-series/episodes/1',
         },
-        image: fixture.image,
+        images: [fixture.image],
       }),
     ).rejects.toThrow('追加先の作品が見つかりません')
 
@@ -531,7 +611,10 @@ describe('MangaKuraDatabase', () => {
           title: '失敗する話',
           sourcePageUrl: 'https://example.com/development-series/episodes/failed',
         },
-        image: { ...fixture.image, id: 'failed-image', width: 0 },
+        images: [
+          { ...fixture.image, id: 'first-new-image' },
+          { ...fixture.image, id: 'failed-image', width: 0 },
+        ],
       }),
     ).rejects.toThrow()
 

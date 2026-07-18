@@ -1,6 +1,10 @@
 import type { ImageCandidate } from './imageCandidateFactory'
 
-export type ImageBlobFetchErrorKind = 'http' | 'network' | 'unsupportedContentType'
+export type ImageBlobFetchErrorKind =
+  | 'http'
+  | 'network'
+  | 'unsupportedContentType'
+  | 'missingDimensions'
 
 export interface ImageBlobFetchErrorDetails {
   candidateId: string
@@ -34,8 +38,8 @@ export interface FetchedImageBlob {
   sourceUrl: string
   mimeType: string
   fileSize: number
-  width?: number
-  height?: number
+  width: number
+  height: number
 }
 
 export type ImageBlobBatchFetchResult =
@@ -60,6 +64,13 @@ export async function fetchImageBlob(
   candidate: ImageCandidate,
   dependencies: ImageBlobClientDependencies = { fetch },
 ): Promise<FetchedImageBlob> {
+  if (candidate.width === undefined || candidate.height === undefined) {
+    throw new ImageBlobFetchError('missingDimensions', '画像の幅と高さを取得できませんでした。', {
+      candidateId: candidate.id,
+      imageUrl: candidate.imageUrl,
+    })
+  }
+
   let response: Response
 
   try {

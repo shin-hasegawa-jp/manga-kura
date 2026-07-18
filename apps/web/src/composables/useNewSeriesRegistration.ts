@@ -23,7 +23,7 @@ export function useNewSeriesRegistration() {
           title: newSeriesEpisodeTitle.value,
           sourcePageUrl: newSeriesSourcePageUrl.value,
         },
-        createFixedImageForRegistration(),
+        [createFixedImageForRegistration()],
       )
     } finally {
       isSubmittingNewSeries.value = false

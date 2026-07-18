@@ -16,36 +16,41 @@ export type RegistrationImage = Pick<
   'id' | 'displayOrder' | 'blob' | 'sourceUrl' | 'mimeType' | 'fileSize' | 'width' | 'height'
 >
 
+export type RegistrationImageSource = Pick<
+  ComicImage,
+  'blob' | 'sourceUrl' | 'mimeType' | 'fileSize' | 'width' | 'height'
+>
+
 export interface RegisterSeriesWithFirstEpisodeInput {
   registration: CreateSeriesRegistration
-  image: RegistrationImage
+  images: readonly RegistrationImage[]
 }
 
 export interface RegisterStandaloneEpisodeInput {
   registration: CreateStandaloneEpisodeRegistration
-  image: RegistrationImage
+  images: readonly RegistrationImage[]
 }
 
 export interface AddEpisodeToSeriesInput {
   registration: AddEpisodeToSeriesRegistration
-  image: RegistrationImage
+  images: readonly RegistrationImage[]
 }
 
 export interface RegisteredSeriesWithFirstEpisode {
   series: Series
   episode: Episode
-  image: ComicImage
+  images: ComicImage[]
 }
 
 export interface RegisteredStandaloneEpisode {
   episode: Episode
-  image: ComicImage
+  images: ComicImage[]
 }
 
 export interface AddedEpisodeToSeries {
   series: Series
   episode: Episode
-  image: ComicImage
+  images: ComicImage[]
 }
 
 export interface RegistrationServiceDependencies {
@@ -65,6 +70,34 @@ export interface ComicRegistrationService {
 
 export function createRegistrationId(): string {
   return globalThis.crypto?.randomUUID() ?? uuidv4()
+}
+
+export function createRegistrationImages(
+  imageSources: readonly RegistrationImageSource[],
+  createId: () => string = createRegistrationId,
+): RegistrationImage[] {
+  return imageSources.map((image, displayOrder) => ({
+    ...image,
+    id: createId(),
+    displayOrder,
+  }))
+}
+
+function createComicImages(
+  images: readonly RegistrationImage[],
+  episodeId: string,
+  createdAt: Date,
+): ComicImage[] {
+  if (images.length === 0) {
+    throw new Error('保存する画像が選択されていません')
+  }
+
+  return images.map((image, displayOrder) => ({
+    ...image,
+    displayOrder,
+    episodeId,
+    createdAt,
+  }))
 }
 
 export function createComicRegistrationService(
@@ -96,11 +129,7 @@ export function createComicRegistrationService(
         scrollPosition: 0,
         scrollProgress: 0,
       }
-      const image: ComicImage = {
-        ...input.image,
-        episodeId: episode.id,
-        createdAt: registeredAt,
-      }
+      const images = createComicImages(input.images, episode.id, registeredAt)
 
       await database.transaction(
         'rw',
@@ -110,11 +139,13 @@ export function createComicRegistrationService(
         async () => {
           await repository.series.save(series)
           await repository.episodes.save(episode)
-          await repository.images.save(image)
+          for (const image of images) {
+            await repository.images.save(image)
+          }
         },
       )
 
-      return { series, episode, image }
+      return { series, episode, images }
     },
     async registerStandaloneEpisode(input) {
       const registration = validateCreateStandaloneEpisodeRegistration(input.registration)
@@ -128,18 +159,16 @@ export function createComicRegistrationService(
         scrollPosition: 0,
         scrollProgress: 0,
       }
-      const image: ComicImage = {
-        ...input.image,
-        episodeId: episode.id,
-        createdAt: registeredAt,
-      }
+      const images = createComicImages(input.images, episode.id, registeredAt)
 
       await database.transaction('rw', database.episodes, database.images, async () => {
         await repository.episodes.save(episode)
-        await repository.images.save(image)
+        for (const image of images) {
+          await repository.images.save(image)
+        }
       })
 
-      return { episode, image }
+      return { episode, images }
     },
     async addEpisodeToSeries(input) {
       const registration = validateAddEpisodeToSeriesRegistration(input.registration)
@@ -172,17 +201,15 @@ export function createComicRegistrationService(
             scrollPosition: 0,
             scrollProgress: 0,
           }
-          const image: ComicImage = {
-            ...input.image,
-            episodeId: episode.id,
-            createdAt: registeredAt,
-          }
+          const images = createComicImages(input.images, episode.id, registeredAt)
 
           await repository.series.save(series)
           await repository.episodes.save(episode)
-          await repository.images.save(image)
+          for (const image of images) {
+            await repository.images.save(image)
+          }
 
-          return { series, episode, image }
+          return { series, episode, images }
         },
       )
     },

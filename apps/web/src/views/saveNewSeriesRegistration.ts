@@ -8,10 +8,10 @@ export type NewSeriesRegistrationSubmission =
 export async function submitNewSeriesRegistration(
   service: Pick<ComicRegistrationService, 'registerSeriesWithFirstEpisode'>,
   registration: CreateSeriesRegistration,
-  image: RegistrationImage,
+  images: readonly RegistrationImage[],
 ): Promise<NewSeriesRegistrationSubmission> {
   try {
-    await service.registerSeriesWithFirstEpisode({ registration, image })
+    await service.registerSeriesWithFirstEpisode({ registration, images })
 
     return { status: 'success', message: '新規作品を登録しました。' }
   } catch {

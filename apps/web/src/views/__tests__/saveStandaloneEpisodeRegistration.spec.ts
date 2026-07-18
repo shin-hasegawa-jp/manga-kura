@@ -15,13 +15,13 @@ describe('単独の話登録フォームの送信', () => {
       async registerStandaloneEpisode(input: RegisterStandaloneEpisodeInput) {
         submittedInput = input
 
-        return { episode: fixture.episode, image: fixture.image }
+        return { episode: fixture.episode, images: [fixture.image] }
       },
     }
 
-    const result = await submitStandaloneEpisodeRegistration(service, registration, fixture.image)
+    const result = await submitStandaloneEpisodeRegistration(service, registration, [fixture.image])
 
-    expect(submittedInput).toEqual({ registration, image: fixture.image })
+    expect(submittedInput).toEqual({ registration, images: [fixture.image] })
     expect(result).toEqual({ status: 'success', message: '単独の話を登録しました。' })
   })
 
@@ -39,7 +39,7 @@ describe('単独の話登録フォームの送信', () => {
         title: '',
         sourcePageUrl: 'https://example.com/standalone-episodes/1',
       },
-      fixture.image,
+      [fixture.image],
     )
 
     expect(result).toEqual({

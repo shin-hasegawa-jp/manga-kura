@@ -8,14 +8,14 @@ export type ExistingSeriesEpisodeRegistrationSubmission =
 export async function submitExistingSeriesEpisodeRegistration(
   service: Pick<ComicRegistrationService, 'addEpisodeToSeries'>,
   registration: AddEpisodeToSeriesRegistration,
-  image: RegistrationImage,
+  images: readonly RegistrationImage[],
 ): Promise<ExistingSeriesEpisodeRegistrationSubmission> {
   if (registration.seriesId.trim() === '') {
     return { status: 'error', message: '追加先の作品を選択してください。' }
   }
 
   try {
-    await service.addEpisodeToSeries({ registration, image })
+    await service.addEpisodeToSeries({ registration, images })
 
     return { status: 'success', message: '作品に話を追加しました。' }
   } catch (error) {

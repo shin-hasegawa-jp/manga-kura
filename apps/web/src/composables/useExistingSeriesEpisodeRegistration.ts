@@ -33,7 +33,7 @@ export function useExistingSeriesEpisodeRegistration() {
           title: existingSeriesEpisodeTitle.value,
           sourcePageUrl: existingSeriesEpisodeSourcePageUrl.value,
         },
-        createFixedImageForRegistration(),
+        [createFixedImageForRegistration()],
       )
     } finally {
       isSubmittingExistingSeriesEpisode.value = false

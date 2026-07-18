@@ -11,7 +11,7 @@ describe('既存作品への話追加フォームの送信', () => {
       async addEpisodeToSeries() {
         wasCalled = true
 
-        return fixture
+        return { series: fixture.series, episode: fixture.episode, images: [fixture.image] }
       },
     }
 
@@ -22,7 +22,7 @@ describe('既存作品への話追加フォームの送信', () => {
         title: '第2話',
         sourcePageUrl: 'https://example.com/development-series/episodes/2',
       },
-      fixture.image,
+      [fixture.image],
     )
 
     expect(wasCalled).toBe(false)
@@ -44,7 +44,7 @@ describe('既存作品への話追加フォームの送信', () => {
         title: '第2話',
         sourcePageUrl: 'https://example.com/unknown-series/episodes/2',
       },
-      fixture.image,
+      [fixture.image],
     )
 
     expect(result).toEqual({
@@ -65,17 +65,15 @@ describe('既存作品への話追加フォームの送信', () => {
       async addEpisodeToSeries(input: AddEpisodeToSeriesInput) {
         submittedInput = input
 
-        return fixture
+        return { series: fixture.series, episode: fixture.episode, images: [fixture.image] }
       },
     }
 
-    const result = await submitExistingSeriesEpisodeRegistration(
-      service,
-      registration,
+    const result = await submitExistingSeriesEpisodeRegistration(service, registration, [
       fixture.image,
-    )
+    ])
 
-    expect(submittedInput).toEqual({ registration, image: fixture.image })
+    expect(submittedInput).toEqual({ registration, images: [fixture.image] })
     expect(result).toEqual({ status: 'success', message: '作品に話を追加しました。' })
   })
 })

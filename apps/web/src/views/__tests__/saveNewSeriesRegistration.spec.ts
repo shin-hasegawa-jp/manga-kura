@@ -16,13 +16,13 @@ describe('新規作品登録フォームの送信', () => {
       async registerSeriesWithFirstEpisode(input: RegisterSeriesWithFirstEpisodeInput) {
         submittedInput = input
 
-        return fixture
+        return { series: fixture.series, episode: fixture.episode, images: [fixture.image] }
       },
     }
 
-    const result = await submitNewSeriesRegistration(service, registration, fixture.image)
+    const result = await submitNewSeriesRegistration(service, registration, [fixture.image])
 
-    expect(submittedInput).toEqual({ registration, image: fixture.image })
+    expect(submittedInput).toEqual({ registration, images: [fixture.image] })
     expect(result).toEqual({ status: 'success', message: '新規作品を登録しました。' })
   })
 
@@ -41,7 +41,7 @@ describe('新規作品登録フォームの送信', () => {
         title: '第1話',
         sourcePageUrl: 'https://example.com/new-series/episodes/1',
       },
-      fixture.image,
+      [fixture.image],
     )
 
     expect(result).toEqual({

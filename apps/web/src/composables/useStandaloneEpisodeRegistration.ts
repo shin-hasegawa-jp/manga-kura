@@ -21,7 +21,7 @@ export function useStandaloneEpisodeRegistration() {
           title: standaloneEpisodeTitle.value,
           sourcePageUrl: standaloneEpisodeSourcePageUrl.value,
         },
-        createFixedImageForRegistration(),
+        [createFixedImageForRegistration()],
       )
     } finally {
       isSubmittingStandaloneEpisode.value = false

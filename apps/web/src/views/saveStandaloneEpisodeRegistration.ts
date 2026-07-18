@@ -8,10 +8,10 @@ export type StandaloneEpisodeRegistrationSubmission =
 export async function submitStandaloneEpisodeRegistration(
   service: Pick<ComicRegistrationService, 'registerStandaloneEpisode'>,
   registration: CreateStandaloneEpisodeRegistration,
-  image: RegistrationImage,
+  images: readonly RegistrationImage[],
 ): Promise<StandaloneEpisodeRegistrationSubmission> {
   try {
-    await service.registerStandaloneEpisode({ registration, image })
+    await service.registerStandaloneEpisode({ registration, images })
 
     return { status: 'success', message: '単独の話を登録しました。' }
   } catch {
