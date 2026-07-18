@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from collections.abc import Callable
+from uuid import uuid4
 
 from app.config import Settings
 from app.errors import ApiError, ApiErrorCode
@@ -29,6 +31,7 @@ class PageAnalyzer:
         settings: Settings,
         http_client: ExternalHttpClient | None = None,
         token_issuer: ProxyTokenIssuer | None = None,
+        batch_id_factory: Callable[[], str] | None = None,
     ) -> None:
         self._settings = settings
         self._http_client = http_client or ExternalHttpClient(settings)
@@ -36,6 +39,7 @@ class PageAnalyzer:
             settings.proxy_token_secret.get_secret_value(),
             settings.proxy_token_ttl_seconds,
         )
+        self._batch_id_factory = batch_id_factory or (lambda: uuid4().hex)
 
     async def analyze(self, url: str) -> PageAnalysis:
         fetched_html = await fetch_page_html(url, self._http_client, self._settings)
@@ -43,12 +47,17 @@ class PageAnalyzer:
         if len(candidates) > self._settings.max_image_count:
             raise ApiError(ApiErrorCode.TOO_MANY_CANDIDATES)
 
+        batch_id = self._batch_id_factory()
         return PageAnalysis(
             page_url=fetched_html.url,
             candidates=tuple(
                 AnalyzedImageCandidate(
                     candidate=candidate,
-                    proxy_token=self._token_issuer.issue(candidate.image_url),
+                    proxy_token=self._token_issuer.issue(
+                        candidate.image_url,
+                        batch_id,
+                        candidate.id,
+                    ),
                 )
                 for candidate in candidates
             ),

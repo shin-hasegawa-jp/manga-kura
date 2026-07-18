@@ -8,6 +8,7 @@ from app.errors import ApiError, ApiErrorCode
 from app.services.external_http_client import ExternalHttpClient
 from app.services.image_proxy import ImageProxyService
 from app.services.proxy_token import ProxyTokenIssuer
+from app.services.proxy_usage_tracker import ProxyUsageTracker
 
 
 class ResolverStub:
@@ -46,7 +47,20 @@ def _create_service(
         resolver or ResolverStub("93.184.216.34"),
         httpx.MockTransport(handler),
     )
-    return ImageProxyService(resolved_settings, client, issuer), issuer
+    usage_tracker = ProxyUsageTracker(
+        resolved_settings.max_image_count,
+        resolved_settings.max_total_image_bytes,
+        clock=lambda: 100,
+    )
+    return ImageProxyService(resolved_settings, client, issuer, usage_tracker), issuer
+
+
+def _issue_token(
+    issuer: ProxyTokenIssuer,
+    image_url: str,
+    candidate_id: str = "candidate-1",
+) -> str:
+    return issuer.issue(image_url, "batch-1", candidate_id)
 
 
 @pytest.mark.asyncio
@@ -61,7 +75,7 @@ async def test_image_is_streamed_without_persistence() -> None:
         )
 
     service, issuer = _create_service(handler)
-    image = await service.open(issuer.issue("https://example.com/image.jpg"))
+    image = await service.open(_issue_token(issuer, "https://example.com/image.jpg"))
 
     body = b"".join([chunk async for chunk in image.iter_bytes()])
 
@@ -81,7 +95,7 @@ async def test_non_image_content_type_is_rejected() -> None:
     service, issuer = _create_service(handler)
 
     with pytest.raises(ApiError) as error:
-        await service.open(issuer.issue("https://example.com/image"))
+        await service.open(_issue_token(issuer, "https://example.com/image"))
 
     assert error.value.code is ApiErrorCode.UNSUPPORTED_CONTENT_TYPE
 
@@ -101,7 +115,7 @@ async def test_content_length_over_limit_is_rejected_before_streaming() -> None:
     service, issuer = _create_service(handler, settings)
 
     with pytest.raises(ApiError) as error:
-        await service.open(issuer.issue("https://example.com/image.png"))
+        await service.open(_issue_token(issuer, "https://example.com/image.png"))
 
     assert error.value.code is ApiErrorCode.RESPONSE_TOO_LARGE
     assert stream.closed is True
@@ -116,7 +130,7 @@ async def test_measured_size_over_limit_stops_stream() -> None:
 
     settings = Settings().model_copy(update={"max_image_bytes": 10})
     service, issuer = _create_service(handler, settings)
-    image = await service.open(issuer.issue("https://example.com/image.png"))
+    image = await service.open(_issue_token(issuer, "https://example.com/image.png"))
 
     with pytest.raises(ApiError) as error:
         b"".join([chunk async for chunk in image.iter_bytes()])
@@ -135,7 +149,7 @@ async def test_interrupted_upstream_closes_stream() -> None:
         )
 
     service, issuer = _create_service(handler)
-    image = await service.open(issuer.issue("https://example.com/image.webp"))
+    image = await service.open(_issue_token(issuer, "https://example.com/image.webp"))
 
     with pytest.raises(ApiError) as error:
         b"".join([chunk async for chunk in image.iter_bytes()])
@@ -156,7 +170,34 @@ async def test_signed_private_destination_is_rejected() -> None:
     service, issuer = _create_service(handler, resolver=ResolverStub("127.0.0.1"))
 
     with pytest.raises(ApiError) as error:
-        await service.open(issuer.issue("https://internal.example/image.png"))
+        await service.open(_issue_token(issuer, "https://internal.example/image.png"))
 
     assert error.value.code is ApiErrorCode.FORBIDDEN_DESTINATION
     assert request_count == 0
+
+
+@pytest.mark.asyncio
+async def test_total_image_size_is_enforced_across_candidates() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "image/png", "Content-Length": "6"},
+            content=b"123456",
+        )
+
+    settings = Settings().model_copy(
+        update={"max_total_image_bytes": 10, "domain_interval_seconds": 0}
+    )
+    service, issuer = _create_service(handler, settings)
+    first = await service.open(
+        _issue_token(issuer, "https://first.example/image.png", "candidate-1")
+    )
+    assert b"".join([chunk async for chunk in first.iter_bytes()]) == b"123456"
+
+    with pytest.raises(ApiError) as error:
+        await service.open(
+            _issue_token(issuer, "https://second.example/image.png", "candidate-2")
+        )
+
+    assert error.value.code is ApiErrorCode.RESPONSE_TOO_LARGE
+    assert error.value.details == {"resource": "totalImages"}

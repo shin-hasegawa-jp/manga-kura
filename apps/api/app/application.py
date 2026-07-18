@@ -10,6 +10,7 @@ from app.services.external_http_client import ExternalHttpClient
 from app.services.page_analyzer import PageAnalyzer
 from app.services.image_proxy import ImageProxyService
 from app.services.rate_limiter import DomainAccessLimiter, SlidingWindowRateLimiter
+from app.services.proxy_usage_tracker import ProxyUsageTracker
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -29,9 +30,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         resolved_settings,
         external_http_client,
     )
+    proxy_usage_tracker = ProxyUsageTracker(
+        resolved_settings.max_image_count,
+        resolved_settings.max_total_image_bytes,
+    )
     application.state.image_proxy_service = ImageProxyService(
         resolved_settings,
         external_http_client,
+        usage_tracker=proxy_usage_tracker,
     )
     application.state.analyze_rate_limiter = SlidingWindowRateLimiter(
         resolved_settings.rate_limit_requests,

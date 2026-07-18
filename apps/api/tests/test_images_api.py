@@ -43,7 +43,13 @@ async def test_proxy_endpoint_streams_image_with_safe_headers() -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get(
             "/v1/images/proxy",
-            params={"token": issuer.issue("https://example.com/image.png")},
+            params={
+                "token": issuer.issue(
+                    "https://example.com/image.png",
+                    "batch-1",
+                    "candidate-1",
+                )
+            },
         )
 
     assert response.status_code == 200

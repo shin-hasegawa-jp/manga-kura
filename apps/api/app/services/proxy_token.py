@@ -5,8 +5,17 @@ import hmac
 import json
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from app.errors import ApiError, ApiErrorCode
+
+
+@dataclass(frozen=True)
+class ProxyTokenClaims:
+    image_url: str
+    batch_id: str
+    candidate_id: str
+    expires_at: int
 
 
 def _encode(value: bytes) -> str:
@@ -36,9 +45,11 @@ class ProxyTokenIssuer:
         self._ttl_seconds = ttl_seconds
         self._clock = clock
 
-    def issue(self, image_url: str) -> str:
+    def issue(self, image_url: str, batch_id: str, candidate_id: str) -> str:
         payload = json.dumps(
             {
+                "batchId": batch_id,
+                "candidateId": candidate_id,
                 "exp": int(self._clock()) + self._ttl_seconds,
                 "url": image_url,
             },
@@ -49,7 +60,7 @@ class ProxyTokenIssuer:
         signature = hmac.new(self._secret, payload, hashlib.sha256).digest()
         return f"{_encode(payload)}.{_encode(signature)}"
 
-    def verify(self, token: str) -> str:
+    def verify(self, token: str) -> ProxyTokenClaims:
         parts = token.split(".")
         if len(parts) != 2:
             raise ApiError(ApiErrorCode.INVALID_PROXY_TOKEN)
@@ -68,9 +79,23 @@ class ProxyTokenIssuer:
             raise ApiError(ApiErrorCode.INVALID_PROXY_TOKEN)
 
         image_url = decoded_payload.get("url")
+        batch_id = decoded_payload.get("batchId")
+        candidate_id = decoded_payload.get("candidateId")
         expires_at = decoded_payload.get("exp")
-        if not isinstance(image_url, str) or not isinstance(expires_at, int):
+        if (
+            not isinstance(image_url, str)
+            or not isinstance(batch_id, str)
+            or not batch_id
+            or not isinstance(candidate_id, str)
+            or not candidate_id
+            or not isinstance(expires_at, int)
+        ):
             raise ApiError(ApiErrorCode.INVALID_PROXY_TOKEN)
         if isinstance(expires_at, bool) or self._clock() >= expires_at:
             raise ApiError(ApiErrorCode.INVALID_PROXY_TOKEN)
-        return image_url
+        return ProxyTokenClaims(
+            image_url=image_url,
+            batch_id=batch_id,
+            candidate_id=candidate_id,
+            expires_at=expires_at,
+        )

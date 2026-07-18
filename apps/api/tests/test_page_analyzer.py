@@ -44,6 +44,13 @@ async def test_html_fetch_and_candidate_extraction_are_integrated() -> None:
         "https://example.com/2.jpg",
     )
     assert all(item.proxy_token.count(".") == 1 for item in result.candidates)
+    verifier = ProxyTokenIssuer("test-secret", 900, clock=lambda: 1000)
+    claims = tuple(verifier.verify(item.proxy_token) for item in result.candidates)
+    assert len({claim.batch_id for claim in claims}) == 1
+    assert tuple(claim.candidate_id for claim in claims) == (
+        "image-candidate-0",
+        "image-candidate-1",
+    )
 
 
 @pytest.mark.asyncio

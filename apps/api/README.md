@@ -133,7 +133,7 @@ AnalyzePageResponse
 - candidates: list[ImageCandidateResponse]
 ```
 
-候補0件は通信・解析失敗ではないため、200と空の`candidates`を返します。候補IDはレスポンス内で一意とし、`domOrder`の昇順に並べます。`proxyToken`は対象画像URLと期限をサーバーだけが検証できる形式で表し、生のURLを画像中継APIの入力にしません。
+候補0件は通信・解析失敗ではないため、200と空の`candidates`を返します。候補IDはレスポンス内で一意とし、`domOrder`の昇順に並べます。`proxyToken`は対象画像URL、解析バッチID、候補ID、有効期限をHMAC署名し、生のURLを画像中継APIの入力にしません。トークンは単回利用とし、同じ解析バッチ内で最大100枚・合計200 MiBまで中継できます。
 
 ### `GET /v1/images/proxy?token=...`
 
