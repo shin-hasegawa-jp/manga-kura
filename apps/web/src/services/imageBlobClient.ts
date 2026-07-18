@@ -1,3 +1,8 @@
+import {
+  AcquisitionApiClientError,
+  fetchProxiedImage,
+  type ProxiedImage,
+} from './acquisitionApiClient'
 import type { ImageCandidate } from './imageCandidateFactory'
 
 export type ImageBlobFetchErrorKind =
@@ -53,6 +58,7 @@ export type ImageBlobBatchFetchResult =
 
 export interface ImageBlobClientDependencies {
   fetch: typeof fetch
+  fetchProxiedImage?(proxyToken: string): Promise<ProxiedImage>
 }
 
 const defaultDependencies: ImageBlobClientDependencies = {
@@ -64,6 +70,55 @@ function getImageMediaType(contentType: string): string | undefined {
   return mediaType?.startsWith('image/') ? mediaType : undefined
 }
 
+function toApiImageFetchError(
+  error: AcquisitionApiClientError,
+  candidate: ImageCandidate,
+): ImageBlobFetchError {
+  const details = {
+    candidateId: candidate.id,
+    imageUrl: candidate.imageUrl,
+    status: error.status,
+    contentType: error.contentType,
+  }
+  if (error.kind === 'unsupportedContentType' || error.code === 'unsupported_content_type') {
+    return new ImageBlobFetchError('unsupportedContentType', error.message, details)
+  }
+  if (error.kind === 'api') {
+    return new ImageBlobFetchError('http', error.message, details)
+  }
+  return new ImageBlobFetchError('network', error.message, details)
+}
+
+async function fetchApiImageBlob(
+  candidate: Extract<ImageCandidate, { acquisitionMethod: 'api' }>,
+  dimensions: { width: number; height: number },
+  dependencies: ImageBlobClientDependencies,
+): Promise<FetchedImageBlob> {
+  let image: ProxiedImage
+  try {
+    image = await (dependencies.fetchProxiedImage ?? fetchProxiedImage)(candidate.proxyToken)
+  } catch (error) {
+    if (error instanceof AcquisitionApiClientError) {
+      throw toApiImageFetchError(error, candidate)
+    }
+    throw new ImageBlobFetchError('network', '中継画像の取得中にエラーが発生しました。', {
+      candidateId: candidate.id,
+      imageUrl: candidate.imageUrl,
+    })
+  }
+
+  return {
+    candidateId: candidate.id,
+    domOrder: candidate.domOrder,
+    blob: image.blob,
+    sourceUrl: candidate.imageUrl,
+    mimeType: image.mimeType,
+    fileSize: image.fileSize,
+    width: dimensions.width,
+    height: dimensions.height,
+  }
+}
+
 export async function fetchImageBlob(
   candidate: ImageCandidate,
   dependencies: ImageBlobClientDependencies = defaultDependencies,
@@ -73,6 +128,14 @@ export async function fetchImageBlob(
       candidateId: candidate.id,
       imageUrl: candidate.imageUrl,
     })
+  }
+
+  if (candidate.acquisitionMethod === 'api') {
+    return fetchApiImageBlob(
+      candidate,
+      { width: candidate.width, height: candidate.height },
+      dependencies,
+    )
   }
 
   let response: Response
@@ -167,4 +230,31 @@ export async function fetchSelectedImageBlobs(
     return { status: 'failure', images: [], failures }
   }
   return { status: 'partial-failure', images, failures }
+}
+
+export function createSelectedImageBlobFetcher(
+  dependencies: ImageBlobClientDependencies = defaultDependencies,
+): (candidates: readonly ImageCandidate[]) => Promise<ImageBlobBatchFetchResult> {
+  const fetchedImages = new Map<string, FetchedImageBlob>()
+
+  return async (candidates) => {
+    const selectedCandidates = candidates.filter(({ isSelected }) => isSelected)
+    const uncachedCandidates = selectedCandidates.filter(({ id }) => !fetchedImages.has(id))
+    const result = await fetchSelectedImageBlobs(uncachedCandidates, dependencies)
+    for (const image of result.images) {
+      fetchedImages.set(image.candidateId, image)
+    }
+
+    const images = selectedCandidates.flatMap((candidate) => {
+      const image = fetchedImages.get(candidate.id)
+      return image === undefined ? [] : [image]
+    })
+    if (result.failures.length === 0) {
+      return { status: 'success', images, failures: [] }
+    }
+    if (images.length === 0) {
+      return { status: 'failure', images: [], failures: result.failures }
+    }
+    return { status: 'partial-failure', images, failures: result.failures }
+  }
 }

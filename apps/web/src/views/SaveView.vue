@@ -5,6 +5,7 @@ import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration
 import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpisodeRegistration'
 import type { RegistrationImage } from '@/database/registrationService'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
+import { createSelectedImageBlobFetcher } from '@/services/imageBlobClient'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
 import { getSaveErrorPresentation, markImageFetchFailures } from './acquisitionErrorPresenter'
 import { getImageCandidateListState } from './imageCandidateListState'
@@ -22,6 +23,7 @@ const pageUrl = ref('')
 const pageImageAnalysisState = ref<PageImageAnalysisState>()
 const isSavingAnalyzedPage = ref(false)
 const saveFlowError = ref('')
+let fetchAnalyzedImages = createSelectedImageBlobFetcher()
 const imageCandidateListState = computed(() =>
   getImageCandidateListState(pageImageAnalysisState.value),
 )
@@ -69,6 +71,7 @@ async function analyzePageUrl() {
     return
   }
 
+  fetchAnalyzedImages = createSelectedImageBlobFetcher()
   const result = await analyzePageImages(pageUrl.value, undefined, (state) => {
     pageImageAnalysisState.value = state
   })
@@ -128,6 +131,7 @@ async function saveCurrentRegistration() {
   try {
     const details = getCurrentRegistrationDetails()
     const result = await saveAnalyzedPage(pageImageAnalysisState.value, details, {
+      fetchImages: fetchAnalyzedImages,
       register: (images) => registerMode(details.mode, images),
     })
 
@@ -148,6 +152,7 @@ async function saveCurrentRegistration() {
 
     pageUrl.value = ''
     pageImageAnalysisState.value = undefined
+    fetchAnalyzedImages = createSelectedImageBlobFetcher()
     resetNewSeriesFields()
     resetStandaloneEpisodeFields()
     resetExistingSeriesEpisodeFields()
@@ -260,6 +265,13 @@ function selectRegistrationMode(mode: RegistrationMode) {
         {{ imageCandidateListState.message }}
       </p>
       <template v-else-if="imageCandidateListState.kind === 'populated'">
+        <p
+          v-if="imageCandidateListState.acquisitionMethod === 'api'"
+          class="image-candidates__acquisition-method"
+          role="status"
+        >
+          このページは取得API経由で解析しました。
+        </p>
         <div class="image-candidates__selection-actions" aria-label="画像候補の一括選択">
           <button
             type="button"

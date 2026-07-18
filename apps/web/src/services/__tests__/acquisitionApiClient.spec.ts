@@ -3,10 +3,9 @@ import {
   AcquisitionApiClientError,
   analyzePageViaApi,
   fetchProxiedImage,
-  toImageBlobFetchError,
-  toPageHtmlFetchError,
   type AcquisitionApiClientDependencies,
 } from '../acquisitionApiClient'
+import { toImageBlobFetchError, toPageHtmlFetchError } from '../acquisitionApiErrorAdapters'
 
 const apiBaseUrl = 'https://api.example.com/base/'
 

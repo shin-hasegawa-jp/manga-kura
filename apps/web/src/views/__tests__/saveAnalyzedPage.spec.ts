@@ -25,6 +25,14 @@ function createCandidate(isSelected = true): ImageCandidate {
   }
 }
 
+function createApiCandidate(): Extract<ImageCandidate, { acquisitionMethod: 'api' }> {
+  return {
+    ...createCandidate(),
+    acquisitionMethod: 'api',
+    proxyToken: 'proxy-token',
+  }
+}
+
 const validDetails: AnalyzedPageRegistrationDetails = {
   mode: 'newSeries',
   seriesTitle: '作品名',
@@ -136,6 +144,48 @@ describe('解析済みページの保存フロー', () => {
     expect(dependencies.register).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ id: 'registration-image-1' })]),
     )
+  })
+
+  it.each<{
+    caseName: string
+    details: AnalyzedPageRegistrationDetails
+  }>([
+    { caseName: '新規作品', details: validDetails },
+    {
+      caseName: '単独の話',
+      details: {
+        mode: 'standaloneEpisode',
+        title: '第1話',
+        sourcePageUrl: validDetails.sourcePageUrl,
+      },
+    },
+    {
+      caseName: '既存作品への話追加',
+      details: {
+        mode: 'existingSeries',
+        seriesId: 'series-1',
+        title: '第1話',
+        sourcePageUrl: validDetails.sourcePageUrl,
+      },
+    },
+  ])('API候補を$caseNameの登録処理へ渡す', async ({ details }) => {
+    const candidate = createApiCandidate()
+    const dependencies = createDependencies()
+
+    await expect(
+      saveAnalyzedPage(
+        {
+          status: 'success',
+          pageUrl: validDetails.sourcePageUrl,
+          acquisitionMethod: 'api',
+          candidates: [candidate],
+        },
+        details,
+        dependencies,
+      ),
+    ).resolves.toEqual({ status: 'success' })
+    expect(dependencies.fetchImages).toHaveBeenCalledExactlyOnceWith([candidate])
+    expect(dependencies.register).toHaveBeenCalledOnce()
   })
 
   it('一部画像の取得に失敗した場合は登録処理を開始しない', async () => {

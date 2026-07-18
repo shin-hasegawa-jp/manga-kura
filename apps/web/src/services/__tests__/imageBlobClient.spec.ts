@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ImageCandidate } from '../imageCandidateFactory'
-import { fetchImageBlob, fetchSelectedImageBlobs, ImageBlobFetchError } from '../imageBlobClient'
+import { AcquisitionApiClientError } from '../acquisitionApiClient'
+import {
+  createSelectedImageBlobFetcher,
+  fetchImageBlob,
+  fetchSelectedImageBlobs,
+  ImageBlobFetchError,
+} from '../imageBlobClient'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -19,6 +25,17 @@ function createCandidate(id: string, isSelected = true): ImageCandidate {
     acquisitionMethod: 'direct',
     width: 800,
     height: 1200,
+  }
+}
+
+function createApiCandidate(
+  id: string,
+  isSelected = true,
+): Extract<ImageCandidate, { acquisitionMethod: 'api' }> {
+  return {
+    ...createCandidate(id, isSelected),
+    acquisitionMethod: 'api',
+    proxyToken: `proxy-token-${id}`,
   }
 }
 
@@ -112,6 +129,52 @@ describe('選択画像のBlob取得', () => {
     })
   })
 
+  it('API候補は元画像URLではなく画像中継APIから取得する', async () => {
+    const candidate = createApiCandidate('1')
+    const blob = new Blob(['proxied-image'], { type: 'image/webp' })
+    const fetchMock = vi.fn<typeof fetch>()
+    const fetchProxiedImage = vi.fn(async () => ({
+      blob,
+      mimeType: 'image/webp',
+      fileSize: blob.size,
+    }))
+
+    await expect(
+      fetchImageBlob(candidate, { fetch: fetchMock, fetchProxiedImage }),
+    ).resolves.toEqual({
+      candidateId: candidate.id,
+      domOrder: candidate.domOrder,
+      blob,
+      sourceUrl: candidate.imageUrl,
+      mimeType: 'image/webp',
+      fileSize: blob.size,
+      width: 800,
+      height: 1200,
+    })
+    expect(fetchProxiedImage).toHaveBeenCalledExactlyOnceWith(candidate.proxyToken)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('画像中継APIエラーを候補を特定できる既存エラーへ変換する', async () => {
+    const candidate = createApiCandidate('2')
+    const fetchProxiedImage = vi.fn().mockRejectedValue(
+      new AcquisitionApiClientError('api', 'トークンが無効です。', {
+        status: 400,
+        code: 'invalid_proxy_token',
+      }),
+    )
+
+    await expect(
+      fetchImageBlob(candidate, { fetch: vi.fn<typeof fetch>(), fetchProxiedImage }),
+    ).rejects.toMatchObject({
+      name: 'ImageBlobFetchError',
+      kind: 'http',
+      candidateId: candidate.id,
+      imageUrl: candidate.imageUrl,
+      status: 400,
+    })
+  })
+
   it('選択済み候補だけを元の順番で取得する', async () => {
     const candidates = [createCandidate('1'), createCandidate('2', false), createCandidate('3')]
     const fetchMock = vi
@@ -163,5 +226,37 @@ describe('選択画像のBlob取得', () => {
       { candidateId: '1', kind: 'network' },
       { candidateId: '2', kind: 'network' },
     ])
+  })
+
+  it('再試行時は取得済み画像を再中継せず失敗候補だけを取得する', async () => {
+    const firstCandidate = createApiCandidate('1')
+    const secondCandidate = createApiCandidate('2')
+    const blob = new Blob(['image'], { type: 'image/png' })
+    const fetchProxiedImage = vi
+      .fn()
+      .mockResolvedValueOnce({ blob, mimeType: 'image/png', fileSize: blob.size })
+      .mockRejectedValueOnce(new AcquisitionApiClientError('network', '中継失敗'))
+      .mockResolvedValueOnce({ blob, mimeType: 'image/png', fileSize: blob.size })
+    const fetchImages = createSelectedImageBlobFetcher({
+      fetch: vi.fn<typeof fetch>(),
+      fetchProxiedImage,
+    })
+
+    await expect(fetchImages([firstCandidate, secondCandidate])).resolves.toMatchObject({
+      status: 'partial-failure',
+      images: [expect.objectContaining({ candidateId: '1' })],
+      failures: [expect.objectContaining({ candidateId: '2' })],
+    })
+    await expect(fetchImages([firstCandidate, secondCandidate])).resolves.toMatchObject({
+      status: 'success',
+      images: [
+        expect.objectContaining({ candidateId: '1' }),
+        expect.objectContaining({ candidateId: '2' }),
+      ],
+    })
+    expect(fetchProxiedImage).toHaveBeenCalledTimes(3)
+    expect(fetchProxiedImage).toHaveBeenNthCalledWith(1, firstCandidate.proxyToken)
+    expect(fetchProxiedImage).toHaveBeenNthCalledWith(2, secondCandidate.proxyToken)
+    expect(fetchProxiedImage).toHaveBeenNthCalledWith(3, secondCandidate.proxyToken)
   })
 })
