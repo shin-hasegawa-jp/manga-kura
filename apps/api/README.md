@@ -189,6 +189,7 @@ ApiErrorResponse
 | `API_READ_TIMEOUT_SECONDS` | `10` | 読み取りタイムアウト |
 | `API_TOTAL_TIMEOUT_SECONDS` | `15` | 1取得の全体タイムアウト |
 | `API_MAX_REDIRECTS` | `5` | リダイレクト上限 |
+| `API_MAX_RESPONSE_HEADER_BYTES` | `65536` | レスポンスヘッダー最大64 KiB |
 | `API_MAX_HTML_BYTES` | `5242880` | HTML最大5 MiB |
 | `API_MAX_IMAGE_BYTES` | `20971520` | 1画像最大20 MiB |
 | `API_MAX_IMAGE_COUNT` | `100` | 1解析・保存の最大画像数 |
