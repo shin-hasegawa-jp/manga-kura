@@ -3,8 +3,15 @@ import { computed, ref } from 'vue'
 import { useExistingSeriesEpisodeRegistration } from '@/composables/useExistingSeriesEpisodeRegistration'
 import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration'
 import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpisodeRegistration'
+import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
 import { getImageCandidateListState } from './imageCandidateListState'
+import {
+  clearAllImageCandidateSelections,
+  getImageCandidateSelectionState,
+  selectAllImageCandidates,
+  toggleImageCandidateSelection,
+} from './imageCandidateSelection'
 import { registrationModeOptions, type RegistrationMode } from './saveRegistrationMode'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
@@ -12,6 +19,13 @@ const pageUrl = ref('')
 const pageImageAnalysisState = ref<PageImageAnalysisState>()
 const imageCandidateListState = computed(() =>
   getImageCandidateListState(pageImageAnalysisState.value),
+)
+const imageCandidateSelectionState = computed(() =>
+  getImageCandidateSelectionState(
+    imageCandidateListState.value.kind === 'populated'
+      ? imageCandidateListState.value.candidates
+      : [],
+  ),
 )
 const {
   newSeriesTitle,
@@ -54,6 +68,32 @@ async function analyzePageUrl() {
   if (result.status === 'success' || result.status === 'empty') {
     pageUrl.value = result.pageUrl
   }
+}
+
+function updateImageCandidates(
+  update: (candidates: readonly ImageCandidate[]) => ImageCandidate[],
+) {
+  const state = pageImageAnalysisState.value
+  if (state?.status !== 'success') {
+    return
+  }
+
+  pageImageAnalysisState.value = {
+    ...state,
+    candidates: update(state.candidates),
+  }
+}
+
+function toggleCandidate(candidateId: string) {
+  updateImageCandidates((candidates) => toggleImageCandidateSelection(candidates, candidateId))
+}
+
+function selectAllCandidates() {
+  updateImageCandidates(selectAllImageCandidates)
+}
+
+function clearAllCandidateSelections() {
+  updateImageCandidates(clearAllImageCandidateSelections)
 }
 
 function selectRegistrationMode(mode: RegistrationMode) {
@@ -118,7 +158,8 @@ function selectRegistrationMode(mode: RegistrationMode) {
       <div class="image-candidates__heading">
         <h2 id="image-candidates-heading">画像候補</h2>
         <span v-if="imageCandidateListState.kind === 'populated'">
-          {{ imageCandidateListState.candidates.length }}件
+          {{ imageCandidateSelectionState.selectedCount }} /
+          {{ imageCandidateSelectionState.totalCount }}件を選択
         </span>
       </div>
 
@@ -128,32 +169,59 @@ function selectRegistrationMode(mode: RegistrationMode) {
       <p v-else-if="imageCandidateListState.kind === 'empty'" class="image-candidates__empty">
         このページから画像候補を抽出できませんでした。
       </p>
-      <ul v-else-if="imageCandidateListState.kind === 'populated'" class="image-candidate-list">
-        <li
-          v-for="candidate in imageCandidateListState.candidates"
-          :key="candidate.id"
-          class="image-candidate"
-          :class="{ 'image-candidate--failed': candidate.fetchStatus === 'failed' }"
-        >
-          <img
-            v-if="candidate.fetchStatus !== 'failed'"
-            class="image-candidate__preview"
-            :src="candidate.imageUrl"
-            :alt="`画像候補 ${candidate.domOrder + 1}`"
-          />
-          <div v-else class="image-candidate__preview image-candidate__preview--failed">
-            読込失敗
-          </div>
-          <div class="image-candidate__details">
-            <strong>候補 {{ candidate.domOrder + 1 }}</strong>
-            <span v-if="candidate.width !== undefined && candidate.height !== undefined">
-              {{ candidate.width }} × {{ candidate.height }} px
-            </span>
-            <span v-else>サイズ取得不可</span>
-            <span>{{ candidate.isSelected ? '選択済み' : '未選択' }}</span>
-          </div>
-        </li>
-      </ul>
+      <template v-else-if="imageCandidateListState.kind === 'populated'">
+        <div class="image-candidates__selection-actions" aria-label="画像候補の一括選択">
+          <button
+            type="button"
+            :disabled="
+              imageCandidateSelectionState.selectedCount === imageCandidateSelectionState.totalCount
+            "
+            @click="selectAllCandidates"
+          >
+            すべて選択
+          </button>
+          <button
+            type="button"
+            :disabled="imageCandidateSelectionState.selectedCount === 0"
+            @click="clearAllCandidateSelections"
+          >
+            すべて解除
+          </button>
+        </div>
+        <ul class="image-candidate-list">
+          <li
+            v-for="candidate in imageCandidateListState.candidates"
+            :key="candidate.id"
+            class="image-candidate"
+            :class="{ 'image-candidate--failed': candidate.fetchStatus === 'failed' }"
+          >
+            <img
+              v-if="candidate.fetchStatus !== 'failed'"
+              class="image-candidate__preview"
+              :src="candidate.imageUrl"
+              :alt="`画像候補 ${candidate.domOrder + 1}`"
+            />
+            <div v-else class="image-candidate__preview image-candidate__preview--failed">
+              読込失敗
+            </div>
+            <div class="image-candidate__details">
+              <label class="image-candidate__selection">
+                <input
+                  type="checkbox"
+                  :checked="candidate.isSelected"
+                  @change="toggleCandidate(candidate.id)"
+                />
+                <strong>候補 {{ candidate.domOrder + 1 }}</strong>
+              </label>
+              <span v-if="candidate.width !== undefined && candidate.height !== undefined">
+                {{ candidate.width }} × {{ candidate.height }} px
+              </span>
+              <span v-else>サイズ取得不可</span>
+              <span>{{ candidate.isSelected ? '選択済み' : '未選択' }}</span>
+            </div>
+          </li>
+        </ul>
+      </template>
     </section>
 
     <p class="save-view__description">保存する話の登録方法を選択してください。</p>
@@ -190,7 +258,11 @@ function selectRegistrationMode(mode: RegistrationMode) {
         <span>元ページURL</span>
         <input v-model="newSeriesSourcePageUrl" name="sourcePageUrl" type="url" />
       </label>
-      <button class="registration-submit" :disabled="isSubmittingNewSeries" type="submit">
+      <button
+        class="registration-submit"
+        :disabled="isSubmittingNewSeries || !imageCandidateSelectionState.canSave"
+        type="submit"
+      >
         {{ isSubmittingNewSeries ? '登録中…' : '新規作品を登録' }}
       </button>
       <p
@@ -217,7 +289,11 @@ function selectRegistrationMode(mode: RegistrationMode) {
         <span>元ページURL</span>
         <input v-model="standaloneEpisodeSourcePageUrl" name="sourcePageUrl" type="url" />
       </label>
-      <button class="registration-submit" :disabled="isSubmittingStandaloneEpisode" type="submit">
+      <button
+        class="registration-submit"
+        :disabled="isSubmittingStandaloneEpisode || !imageCandidateSelectionState.canSave"
+        type="submit"
+      >
         {{ isSubmittingStandaloneEpisode ? '登録中…' : '単独の話を登録' }}
       </button>
       <p
@@ -255,7 +331,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </label>
       <button
         class="registration-submit"
-        :disabled="isSubmittingExistingSeriesEpisode"
+        :disabled="isSubmittingExistingSeriesEpisode || !imageCandidateSelectionState.canSave"
         type="submit"
       >
         {{ isSubmittingExistingSeriesEpisode ? '登録中…' : '作品へ話を追加' }}
@@ -428,6 +504,26 @@ h2 {
   justify-content: space-between;
 }
 
+.image-candidates__selection-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.image-candidates__selection-actions button {
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  color: rgb(var(--v-theme-primary));
+  font: inherit;
+  font-weight: 700;
+  background: transparent;
+  border: 1px solid rgb(var(--v-theme-primary));
+  border-radius: 0.375rem;
+}
+
+.image-candidates__selection-actions button:disabled {
+  opacity: 0.45;
+}
+
 .image-candidates__empty {
   padding: 1rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
@@ -479,5 +575,18 @@ h2 {
   display: grid;
   gap: 0.125rem;
   font-size: 0.8125rem;
+}
+
+.image-candidate__selection {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.image-candidate__selection input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
 }
 </style>
