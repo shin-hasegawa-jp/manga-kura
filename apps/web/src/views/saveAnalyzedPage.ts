@@ -30,9 +30,14 @@ export type SaveAnalyzedPageResult =
         | 'url-not-analyzed'
         | 'no-images-selected'
         | 'incomplete-registration'
-        | 'image-fetch-failed'
         | 'registration-failed'
       message: string
+    }
+  | {
+      status: 'error'
+      kind: 'image-fetch-failed'
+      message: string
+      failures: ImageBlobBatchFetchResult['failures']
     }
 
 export interface SaveAnalyzedPageDependencies {
@@ -113,6 +118,7 @@ export async function saveAnalyzedPage(
       status: 'error',
       kind: 'image-fetch-failed',
       message: '選択した画像を取得できませんでした。保存は開始されていません。',
+      failures: fetchResult.failures,
     }
   }
 

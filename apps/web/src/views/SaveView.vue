@@ -6,6 +6,7 @@ import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpi
 import type { RegistrationImage } from '@/database/registrationService'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
+import { getSaveErrorPresentation, markImageFetchFailures } from './acquisitionErrorPresenter'
 import { getImageCandidateListState } from './imageCandidateListState'
 import {
   clearAllImageCandidateSelections,
@@ -131,7 +132,17 @@ async function saveCurrentRegistration() {
     })
 
     if (result.status === 'error') {
-      saveFlowError.value = result.message
+      const candidates =
+        pageImageAnalysisState.value?.status === 'success'
+          ? pageImageAnalysisState.value.candidates
+          : []
+      saveFlowError.value = getSaveErrorPresentation(result, candidates).message
+
+      if (result.kind === 'image-fetch-failed') {
+        updateImageCandidates((currentCandidates) =>
+          markImageFetchFailures(currentCandidates, result.failures),
+        )
+      }
       return
     }
 
@@ -246,7 +257,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
         ページから画像候補を解析しています…
       </p>
       <p v-else-if="imageCandidateListState.kind === 'empty'" class="image-candidates__empty">
-        このページから画像候補を抽出できませんでした。
+        {{ imageCandidateListState.message }}
       </p>
       <template v-else-if="imageCandidateListState.kind === 'populated'">
         <div class="image-candidates__selection-actions" aria-label="画像候補の一括選択">

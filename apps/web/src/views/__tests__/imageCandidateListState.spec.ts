@@ -29,7 +29,11 @@ describe('画像候補一覧の表示状態', () => {
   it('候補が0件の場合は対象URLを持つ空状態を返す', () => {
     expect(
       getImageCandidateListState({ status: 'empty', pageUrl: 'https://example.com/comic/' }),
-    ).toEqual({ kind: 'empty', pageUrl: 'https://example.com/comic/' })
+    ).toEqual({
+      kind: 'empty',
+      pageUrl: 'https://example.com/comic/',
+      message: 'このページから画像候補を抽出できませんでした。URLを確認して再解析できます。',
+    })
   })
 
   it('解析失敗の場合はエラーメッセージを返す', () => {
