@@ -6,6 +6,7 @@ import pytest
 from app.config import Settings
 from app.errors import ApiError, ApiErrorCode
 from app.services.external_http_client import ExternalHttpClient
+from app.services.rate_limiter import DomainAccessLimiter
 
 
 class HostResolverStub:
@@ -202,3 +203,32 @@ async def test_response_header_limit_is_enforced() -> None:
 
     assert error.value.code is ApiErrorCode.RESPONSE_TOO_LARGE
     assert error.value.details == {"resource": "headers"}
+
+
+@pytest.mark.asyncio
+async def test_domain_interval_is_shared_across_fetch_operations() -> None:
+    request_count = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        return httpx.Response(200, content=b"ok")
+
+    resolver = HostResolverStub({"example.com": ("93.184.216.34",)})
+    domain_limiter = DomainAccessLimiter(60, clock=lambda: 100)
+    client = ExternalHttpClient(
+        _settings(),
+        resolver,
+        httpx.MockTransport(handler),
+        domain_limiter,
+    )
+
+    async with client.stream("https://example.com/first") as result:
+        await result.response.aread()
+
+    with pytest.raises(ApiError) as error:
+        async with client.stream("https://example.com/second"):
+            pass
+
+    assert error.value.code is ApiErrorCode.RATE_LIMITED
+    assert request_count == 1

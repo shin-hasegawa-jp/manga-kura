@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     max_image_count: int = Field(default=100, gt=0)
     proxy_token_ttl_seconds: int = Field(default=900, gt=0)
     proxy_token_secret: SecretStr = SecretStr("local-development-only-change-me")
+    rate_limit_requests: int = Field(default=30, gt=0)
+    rate_limit_window_seconds: float = Field(default=60, gt=0)
+    domain_interval_seconds: float = Field(default=1, ge=0)
 
     @property
     def parsed_cors_origins(self) -> tuple[str, ...]:

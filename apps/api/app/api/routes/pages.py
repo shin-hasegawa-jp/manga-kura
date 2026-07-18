@@ -1,8 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
-from app.config import Settings, get_settings
 from app.schemas import (
     AnalyzePageRequest,
     AnalyzePageResponse,
@@ -10,22 +9,31 @@ from app.schemas import (
     parse_http_url,
 )
 from app.services.page_analyzer import PageAnalyzer
+from app.services.rate_limiter import SlidingWindowRateLimiter
 
 router = APIRouter(prefix="/v1/pages", tags=["pages"])
 
 
-def get_page_analyzer(
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> PageAnalyzer:
-    return PageAnalyzer(settings)
+def get_page_analyzer(request: Request) -> PageAnalyzer:
+    return request.app.state.page_analyzer
+
+
+def get_analyze_rate_limiter(request: Request) -> SlidingWindowRateLimiter:
+    return request.app.state.analyze_rate_limiter
 
 
 @router.post("/analyze", response_model=AnalyzePageResponse)
 async def analyze_page(
-    request: AnalyzePageRequest,
+    payload: AnalyzePageRequest,
+    request: Request,
     analyzer: Annotated[PageAnalyzer, Depends(get_page_analyzer)],
+    rate_limiter: Annotated[
+        SlidingWindowRateLimiter, Depends(get_analyze_rate_limiter)
+    ],
 ) -> AnalyzePageResponse:
-    analysis = await analyzer.analyze(str(request.url))
+    client_key = request.client.host if request.client is not None else "unknown"
+    await rate_limiter.require(client_key)
+    analysis = await analyzer.analyze(str(payload.url))
     return AnalyzePageResponse(
         page_url=parse_http_url(analysis.page_url),
         candidates=[

@@ -36,9 +36,18 @@ async def handle_api_error(request: Request, exception: Exception) -> JSONRespon
         request.url.path,
     )
     response = _create_error_response(exception.code, exception.details)
+    headers: dict[str, str] = {}
+    retry_after = (
+        exception.details.get("retryAfterSeconds")
+        if exception.details is not None
+        else None
+    )
+    if isinstance(retry_after, int) and not isinstance(retry_after, bool):
+        headers["Retry-After"] = str(retry_after)
     return JSONResponse(
         status_code=exception.status_code,
         content=response.model_dump(mode="json"),
+        headers=headers,
     )
 
 

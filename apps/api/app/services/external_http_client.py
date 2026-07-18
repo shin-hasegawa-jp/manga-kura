@@ -9,6 +9,7 @@ import httpx
 
 from app.config import Settings
 from app.errors import ApiError, ApiErrorCode
+from app.services.rate_limiter import DomainAccessLimiter
 from app.services.url_validator import HostResolver, ValidatedUrl, validate_external_url
 
 REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
@@ -65,10 +66,14 @@ class ExternalHttpClient:
         settings: Settings,
         resolver: HostResolver | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        domain_limiter: DomainAccessLimiter | None = None,
     ) -> None:
         self._settings = settings
         self._resolver = resolver
         self._transport = transport
+        self._domain_limiter = domain_limiter or DomainAccessLimiter(
+            settings.domain_interval_seconds
+        )
 
     @asynccontextmanager
     async def stream(self, url: str) -> AsyncIterator[ExternalHttpResponse]:
@@ -102,6 +107,7 @@ class ExternalHttpClient:
         current_url = initial_url
         visited_urls: set[str] = set()
         redirect_count = 0
+        accessed_domains: set[str] = set()
 
         while True:
             validated_url = await validate_external_url(current_url, self._resolver)
@@ -111,6 +117,9 @@ class ExternalHttpClient:
                     {"reason": "redirect_loop"},
                 )
             visited_urls.add(validated_url.url)
+            if validated_url.hostname not in accessed_domains:
+                await self._domain_limiter.require(validated_url.hostname)
+                accessed_domains.add(validated_url.hostname)
 
             headers = {
                 "Accept": "*/*",

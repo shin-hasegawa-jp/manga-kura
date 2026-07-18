@@ -1,7 +1,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.api.routes.pages import get_page_analyzer
+from app.api.routes.pages import get_analyze_rate_limiter, get_page_analyzer
 from app.application import create_app
 from app.config import Settings
 from app.errors import ApiError, ApiErrorCode
@@ -10,6 +10,7 @@ from app.services.page_analyzer import (
     AnalyzedImageCandidate,
     PageAnalysis,
 )
+from app.services.rate_limiter import SlidingWindowRateLimiter
 
 
 class PageAnalyzerStub:
@@ -24,8 +25,11 @@ class PageAnalyzerStub:
         return self.result
 
 
-def _create_test_app(analyzer: PageAnalyzerStub):
-    application = create_app(Settings())
+def _create_test_app(
+    analyzer: PageAnalyzerStub,
+    settings: Settings | None = None,
+):
+    application = create_app(settings or Settings())
     application.dependency_overrides[get_page_analyzer] = lambda: analyzer
     return application
 
@@ -112,3 +116,32 @@ async def test_analyze_endpoint_rejects_invalid_url() -> None:
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_url"
     assert analyzer.urls == []
+
+
+@pytest.mark.asyncio
+async def test_analyze_endpoint_rate_limits_client_without_trusting_forwarded_for() -> (
+    None
+):
+    analyzer = PageAnalyzerStub(PageAnalysis("https://example.com/", ()))
+    application = _create_test_app(analyzer)
+    limiter = SlidingWindowRateLimiter(1, 60)
+    application.dependency_overrides[get_analyze_rate_limiter] = lambda: limiter
+    transport = ASGITransport(app=application)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        first_response = await client.post(
+            "/v1/pages/analyze",
+            json={"url": "https://example.com"},
+            headers={"X-Forwarded-For": "198.51.100.1"},
+        )
+        second_response = await client.post(
+            "/v1/pages/analyze",
+            json={"url": "https://example.com"},
+            headers={"X-Forwarded-For": "198.51.100.2"},
+        )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 429
+    assert second_response.headers["Retry-After"] == "60"
+    assert second_response.json()["error"]["code"] == "rate_limited"
+    assert analyzer.urls == ["https://example.com/"]
