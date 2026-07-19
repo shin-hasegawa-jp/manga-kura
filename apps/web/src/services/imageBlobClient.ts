@@ -57,14 +57,11 @@ export type ImageBlobBatchFetchResult =
   | { status: 'failure'; images: []; failures: ImageBlobFetchError[] }
 
 export interface ImageBlobClientDependencies {
-  fetch: typeof fetch
   fetchProxiedImage?(proxyToken: string): Promise<ProxiedImage>
   loadBlobDimensions?(blob: Blob): Promise<{ width: number; height: number }>
 }
 
-const defaultDependencies: ImageBlobClientDependencies = {
-  fetch: (input, init) => globalThis.fetch(input, init),
-}
+const defaultDependencies: ImageBlobClientDependencies = {}
 
 function loadBrowserBlobDimensions(blob: Blob): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -112,7 +109,7 @@ function toApiImageFetchError(
   return new ImageBlobFetchError('network', error.message, details)
 }
 
-async function fetchApiImageBlob(
+async function fetchProxiedCandidateImage(
   candidate: ImageCandidate,
   dependencies: ImageBlobClientDependencies,
 ): Promise<FetchedImageBlob> {
@@ -167,7 +164,7 @@ export async function fetchImageBlob(
   candidate: ImageCandidate,
   dependencies: ImageBlobClientDependencies = defaultDependencies,
 ): Promise<FetchedImageBlob> {
-  return fetchApiImageBlob(candidate, dependencies)
+  return fetchProxiedCandidateImage(candidate, dependencies)
 }
 
 export async function fetchSelectedImageBlobs(
