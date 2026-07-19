@@ -1,0 +1,201 @@
+/**
+ * 共通表示部品のスタイル（本棚・作品詳細・保存で繰り返す操作・表示を統一する）。
+ *
+ * すべて tokens.css のデザイントークンを参照し、画面ごとに同じ色値・寸法を
+ * 直接書かないようにする。状態は色だけに依存せず、形・アイコン・ラベルと
+ * 組み合わせて表現する（各画面のマークアップ側でアイコン等を付与する）。
+ *
+ * ここに置くのは既存機能で使う部品だけ。検索・並べ替え・削除・通知・確認ダイアログ
+ * など未実装機能向けの部品は先行して作らない。
+ */
+
+/* ---- ボタン ---- */
+.app-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--app-space-2xs);
+  min-height: 3.25rem;
+  padding: 0 var(--app-space-md);
+  font-family: inherit;
+  font-size: var(--app-font-size-md);
+  font-weight: var(--app-font-weight-bold);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-lg);
+  cursor: pointer;
+  transition:
+    filter 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.app-btn--block {
+  width: 100%;
+}
+
+.app-btn:focus-visible {
+  outline: 0.1875rem solid var(--app-color-primary);
+  outline-offset: 0.125rem;
+}
+
+.app-btn:disabled,
+.app-btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 主要アクション（ニアブラックの塗り） */
+.app-btn--primary {
+  color: var(--app-color-on-cta);
+  background: var(--app-color-cta);
+}
+
+.app-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+/* 補助アクション（淡いパネル地） */
+.app-btn--secondary {
+  color: var(--app-color-text);
+  background: var(--app-color-panel);
+}
+
+.app-btn--secondary:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+/* 枠線のみ（アクセント色） */
+.app-btn--outline {
+  color: var(--app-color-primary);
+  background: transparent;
+  border-color: var(--app-color-primary);
+}
+
+/* テキストリンク調 */
+.app-btn--text {
+  min-height: auto;
+  padding: var(--app-space-3xs) var(--app-space-2xs);
+  color: var(--app-color-primary);
+  background: transparent;
+  border-radius: var(--app-radius-sm);
+}
+
+/* アイコンのみのボタン */
+.app-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--app-color-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--app-radius-pill);
+  cursor: pointer;
+}
+
+.app-icon-btn:hover {
+  background: var(--app-color-panel);
+}
+
+.app-icon-btn:focus-visible {
+  outline: 0.1875rem solid var(--app-color-primary);
+  outline-offset: 0.125rem;
+}
+
+/* ---- 選択式（登録方法などの選択肢） ---- */
+.app-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2xs);
+  min-height: 3.25rem;
+  padding: 0 var(--app-space-sm);
+  color: var(--app-color-text-muted);
+  font-family: inherit;
+  font-size: var(--app-font-size-md);
+  font-weight: var(--app-font-weight-semibold);
+  text-align: start;
+  background: var(--app-color-surface);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
+  cursor: pointer;
+}
+
+.app-choice--selected {
+  color: var(--app-color-text);
+  background: rgba(var(--v-theme-primary), 0.08);
+  border-color: var(--app-color-primary);
+}
+
+.app-choice:focus-visible {
+  outline: 0.1875rem solid var(--app-color-primary);
+  outline-offset: 0.125rem;
+}
+
+.app-choice:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- 入力欄・選択欄 ---- */
+.app-field-label {
+  display: grid;
+  gap: var(--app-space-3xs);
+  color: var(--app-color-text);
+  font-size: var(--app-font-size-sm);
+  font-weight: var(--app-font-weight-semibold);
+}
+
+.app-field {
+  min-height: 3.25rem;
+  padding: 0 var(--app-space-xs);
+  color: var(--app-color-text);
+  font: inherit;
+  background: var(--app-color-surface);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
+}
+
+.app-field:focus-visible {
+  border-color: var(--app-color-primary);
+  outline: 0.125rem solid var(--app-color-primary);
+  outline-offset: -0.125rem;
+}
+
+.app-field[aria-invalid='true'] {
+  border-color: var(--app-color-error);
+}
+
+.app-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- メッセージ（読み込み・空・エラー・完了などのインライン表示） ---- */
+.app-message {
+  display: flex;
+  gap: var(--app-space-2xs);
+  align-items: flex-start;
+  margin: 0;
+  padding: var(--app-space-xs) var(--app-space-sm);
+  font-size: var(--app-font-size-sm);
+  border-radius: var(--app-radius-md);
+}
+
+.app-message__icon {
+  flex: 0 0 auto;
+}
+
+.app-message--info {
+  color: var(--app-color-text-muted);
+  background: var(--app-color-panel);
+}
+
+.app-message--error {
+  color: var(--app-color-error);
+  background: rgba(var(--v-theme-error), 0.1);
+}
+
+.app-message--success {
+  color: var(--app-color-success);
+  background: rgba(var(--v-theme-success), 0.1);
+}

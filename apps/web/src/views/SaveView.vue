@@ -219,10 +219,11 @@ function selectRegistrationMode(mode: RegistrationMode) {
       :aria-busy="imageCandidateListState.kind === 'loading'"
       @submit.prevent="analyzePageUrl"
     >
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>取得元ページURL</span>
         <input
           v-model="pageUrl"
+          class="app-field"
           name="pageUrl"
           type="text"
           inputmode="url"
@@ -235,7 +236,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
         />
       </label>
       <button
-        class="registration-submit"
+        class="app-btn app-btn--primary app-btn--block"
         :disabled="imageCandidateListState.kind === 'loading'"
         type="submit"
       >
@@ -244,7 +245,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
       <p
         v-if="imageCandidateListState.kind === 'failure'"
         id="page-url-message"
-        class="registration-message registration-message--error"
+        class="app-message app-message--error"
         role="alert"
       >
         {{ imageCandidateListState.message }}
@@ -267,12 +268,13 @@ function selectRegistrationMode(mode: RegistrationMode) {
       <p v-if="imageCandidateListState.kind === 'loading'" role="status">
         ページから画像候補を解析しています…
       </p>
-      <p v-else-if="imageCandidateListState.kind === 'empty'" class="image-candidates__empty">
+      <p v-else-if="imageCandidateListState.kind === 'empty'" class="app-message app-message--info">
         {{ imageCandidateListState.message }}
       </p>
       <template v-else-if="imageCandidateListState.kind === 'populated'">
         <div class="image-candidates__selection-actions" aria-label="画像候補の一括選択">
           <button
+            class="app-btn app-btn--text"
             type="button"
             :disabled="
               imageCandidateSelectionState.selectedCount === imageCandidateSelectionState.totalCount
@@ -282,6 +284,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
             すべて選択
           </button>
           <button
+            class="app-btn app-btn--text"
             type="button"
             :disabled="imageCandidateSelectionState.selectedCount === 0"
             @click="clearAllCandidateSelections"
@@ -331,8 +334,8 @@ function selectRegistrationMode(mode: RegistrationMode) {
       <button
         v-for="option in registrationModeOptions"
         :key="option.value"
-        class="registration-mode__button"
-        :class="{ 'registration-mode__button--selected': registrationMode === option.value }"
+        class="app-choice registration-mode__button"
+        :class="{ 'app-choice--selected': registrationMode === option.value }"
         type="button"
         :disabled="isSavingAnalyzedPage"
         :aria-pressed="registrationMode === option.value"
@@ -348,20 +351,20 @@ function selectRegistrationMode(mode: RegistrationMode) {
       aria-label="新規作品の入力項目"
       @submit.prevent="saveCurrentRegistration"
     >
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>作品名</span>
-        <input v-model="newSeriesTitle" name="seriesTitle" type="text" />
+        <input v-model="newSeriesTitle" class="app-field" name="seriesTitle" type="text" />
       </label>
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>話タイトル</span>
-        <input v-model="newSeriesEpisodeTitle" name="title" type="text" />
+        <input v-model="newSeriesEpisodeTitle" class="app-field" name="title" type="text" />
       </label>
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>元ページURL</span>
-        <input v-model="newSeriesSourcePageUrl" name="sourcePageUrl" type="url" />
+        <input v-model="newSeriesSourcePageUrl" class="app-field" name="sourcePageUrl" type="url" />
       </label>
       <button
-        class="registration-submit"
+        class="app-btn app-btn--primary app-btn--block"
         :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
         type="submit"
       >
@@ -369,8 +372,8 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </button>
       <p
         v-if="newSeriesSubmission"
-        class="registration-message"
-        :class="`registration-message--${newSeriesSubmission.status}`"
+        class="app-message"
+        :class="`app-message--${newSeriesSubmission.status}`"
         role="status"
       >
         {{ newSeriesSubmission.message }}
@@ -383,16 +386,21 @@ function selectRegistrationMode(mode: RegistrationMode) {
       aria-label="単独の話の入力項目"
       @submit.prevent="saveCurrentRegistration"
     >
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>話タイトル</span>
-        <input v-model="standaloneEpisodeTitle" name="title" type="text" />
+        <input v-model="standaloneEpisodeTitle" class="app-field" name="title" type="text" />
       </label>
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>元ページURL</span>
-        <input v-model="standaloneEpisodeSourcePageUrl" name="sourcePageUrl" type="url" />
+        <input
+          v-model="standaloneEpisodeSourcePageUrl"
+          class="app-field"
+          name="sourcePageUrl"
+          type="url"
+        />
       </label>
       <button
-        class="registration-submit"
+        class="app-btn app-btn--primary app-btn--block"
         :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
         type="submit"
       >
@@ -400,8 +408,8 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </button>
       <p
         v-if="standaloneEpisodeSubmission"
-        class="registration-message"
-        :class="`registration-message--${standaloneEpisodeSubmission.status}`"
+        class="app-message"
+        :class="`app-message--${standaloneEpisodeSubmission.status}`"
         role="status"
       >
         {{ standaloneEpisodeSubmission.message }}
@@ -414,25 +422,30 @@ function selectRegistrationMode(mode: RegistrationMode) {
       aria-label="既存作品への話追加の入力項目"
       @submit.prevent="saveCurrentRegistration"
     >
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>追加先作品</span>
-        <select v-model="existingSeriesId" name="seriesId">
+        <select v-model="existingSeriesId" class="app-field" name="seriesId">
           <option value="">作品を選択してください</option>
           <option v-for="series in seriesOptions" :key="series.id" :value="series.id">
             {{ series.title }}
           </option>
         </select>
       </label>
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>話タイトル</span>
-        <input v-model="existingSeriesEpisodeTitle" name="title" type="text" />
+        <input v-model="existingSeriesEpisodeTitle" class="app-field" name="title" type="text" />
       </label>
-      <label class="registration-fields__label">
+      <label class="app-field-label">
         <span>元ページURL</span>
-        <input v-model="existingSeriesEpisodeSourcePageUrl" name="sourcePageUrl" type="url" />
+        <input
+          v-model="existingSeriesEpisodeSourcePageUrl"
+          class="app-field"
+          name="sourcePageUrl"
+          type="url"
+        />
       </label>
       <button
-        class="registration-submit"
+        class="app-btn app-btn--primary app-btn--block"
         :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
         type="submit"
       >
@@ -442,15 +455,15 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </button>
       <p
         v-if="existingSeriesEpisodeSubmission"
-        class="registration-message"
-        :class="`registration-message--${existingSeriesEpisodeSubmission.status}`"
+        class="app-message"
+        :class="`app-message--${existingSeriesEpisodeSubmission.status}`"
         role="status"
       >
         {{ existingSeriesEpisodeSubmission.message }}
       </p>
     </form>
 
-    <p v-if="saveFlowError" class="registration-message registration-message--error" role="alert">
+    <p v-if="saveFlowError" class="app-message app-message--error" role="alert">
       {{ saveFlowError }}
     </p>
   </main>
@@ -459,7 +472,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
 <style scoped>
 .save-view {
   display: grid;
-  gap: 1rem;
+  gap: var(--app-space-sm);
 }
 
 h1,
@@ -468,142 +481,42 @@ p {
 }
 
 h1 {
-  font-size: 1.5rem;
+  font-size: var(--app-font-size-xl);
 }
 
 h2 {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--app-font-size-lg);
 }
 
 .save-view__description {
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  color: var(--app-color-text-muted);
 }
 
 .registration-mode {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-.registration-mode__button {
-  min-height: 3rem;
-  padding: 0.5rem;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 0.5rem;
-}
-
-.registration-mode__button--selected {
-  color: rgb(var(--v-theme-primary));
-  background: rgba(var(--v-theme-primary), 10%);
-  border-color: rgb(var(--v-theme-primary));
-}
-
-.registration-mode__button:focus-visible {
-  outline: 0.1875rem solid rgb(var(--v-theme-primary));
-  outline-offset: 0.125rem;
+  gap: var(--app-space-2xs);
 }
 
 .registration-fields {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--app-space-2xs);
 }
 
 .page-url-form {
   display: grid;
-  gap: 0.5rem;
-  padding: 1rem;
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 0.5rem;
-}
-
-.registration-fields__label {
-  display: grid;
-  gap: 0.375rem;
-  color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.registration-fields__label input,
-.registration-fields__label select {
-  min-height: 3rem;
-  padding: 0 0.75rem;
-  color: rgb(var(--v-theme-on-surface));
-  font: inherit;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 0.25rem;
-}
-
-.page-url-form input {
-  min-height: 3rem;
-  padding: 0 0.75rem;
-  color: rgb(var(--v-theme-on-surface));
-  font: inherit;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 0.25rem;
-}
-
-.page-url-form input[aria-invalid='true'] {
-  border-color: #b91c1c;
-}
-
-.registration-fields__label input:focus-visible,
-.registration-fields__label select:focus-visible {
-  border-color: rgb(var(--v-theme-primary));
-  outline: 0.125rem solid rgb(var(--v-theme-primary));
-  outline-offset: -0.125rem;
-}
-
-.registration-submit {
-  min-height: 3rem;
-  color: rgb(var(--v-theme-on-primary));
-  font: inherit;
-  font-weight: 700;
-  background: rgb(var(--v-theme-primary));
-  border: 0;
-  border-radius: 0.5rem;
-}
-
-.registration-submit:disabled {
-  opacity: 0.6;
-}
-
-.registration-message {
-  margin: 0;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-}
-
-.registration-message--success {
-  color: rgb(var(--v-theme-on-primary));
-  background: rgb(var(--v-theme-primary));
-}
-
-.registration-message--error {
-  color: #7f1d1d;
-  background: #fee2e2;
-}
-
-.validated-url {
-  overflow-wrap: anywhere;
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.8125rem;
+  gap: var(--app-space-2xs);
+  padding: var(--app-space-sm);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
 }
 
 .image-candidates {
   display: grid;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  border-radius: 0.5rem;
+  gap: var(--app-space-xs);
+  padding: var(--app-space-sm);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
 }
 
 .image-candidates__heading {
@@ -614,36 +527,13 @@ h2 {
 
 .image-candidates__selection-actions {
   display: flex;
-  gap: 0.5rem;
-}
-
-.image-candidates__selection-actions button {
-  min-height: 2.5rem;
-  padding: 0 0.75rem;
-  color: rgb(var(--v-theme-primary));
-  font: inherit;
-  font-weight: 700;
-  background: transparent;
-  border: 1px solid rgb(var(--v-theme-primary));
-  border-radius: 0.375rem;
-}
-
-.image-candidates__selection-actions button:disabled {
-  opacity: 0.45;
-}
-
-.image-candidates__empty {
-  padding: 1rem;
-  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
-  text-align: center;
-  background: rgba(var(--v-theme-on-surface), 5%);
-  border-radius: 0.5rem;
+  gap: var(--app-space-2xs);
 }
 
 .image-candidate-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-  gap: 0.75rem;
+  gap: var(--app-space-xs);
   padding: 0;
   margin: 0;
   list-style: none;
@@ -651,17 +541,17 @@ h2 {
 
 .image-candidate {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--app-space-2xs);
   min-width: 0;
-  padding: 0.5rem;
-  background: rgb(var(--v-theme-surface));
+  padding: var(--app-space-2xs);
+  background: var(--app-color-surface);
   border: 0.125rem solid transparent;
-  border-radius: 0.5rem;
-  box-shadow: 0 0 0 1px rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: var(--app-radius-md);
+  box-shadow: 0 0 0 1px var(--app-color-border);
 }
 
 .image-candidate--failed {
-  border-color: #b91c1c;
+  border-color: var(--app-color-error);
 }
 
 .image-candidate__preview {
@@ -669,14 +559,14 @@ h2 {
   height: 12rem;
   object-fit: contain;
   background: rgba(var(--v-theme-on-surface), 5%);
-  border-radius: 0.25rem;
+  border-radius: var(--app-radius-sm);
 }
 
 .image-candidate__preview--failed {
   display: grid;
   place-items: center;
-  color: #7f1d1d;
-  font-weight: 700;
+  color: var(--app-color-error);
+  font-weight: var(--app-font-weight-bold);
 }
 
 .image-candidate__details {

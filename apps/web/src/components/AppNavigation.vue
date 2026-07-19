@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
 import { mdiBookshelf, mdiCog, mdiCogOutline, mdiFilePlus, mdiFilePlusOutline } from '@mdi/js'
+import AppIcon from './AppIcon.vue'
 
 /**
  * 主要導線は「本棚」「保存」「設定」の3タブ。
@@ -56,10 +57,10 @@ function isActive(item: NavItem): boolean {
       :to="{ name: item.routeName }"
       :aria-current="isActive(item) ? 'page' : undefined"
     >
-      <v-icon
+      <AppIcon
         class="app-navigation__icon"
-        :icon="isActive(item) ? item.iconActive : item.icon"
-        size="24"
+        :path="isActive(item) ? item.iconActive : item.icon"
+        :size="24"
       />
       <span class="app-navigation__label">{{ item.label }}</span>
     </RouterLink>

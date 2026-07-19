@@ -4,6 +4,8 @@ import { RouterLink, useRoute } from 'vue-router'
 import { database } from '@/database/database'
 import { createMangaRepository, type SeriesDetails } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import AppKindBadge from '@/components/AppKindBadge.vue'
+import AppThumbnail from '@/components/AppThumbnail.vue'
 import { getSeriesDetailState } from './seriesDetailState'
 import {
   createSeriesEpisodeListItemPresenter,
@@ -51,32 +53,34 @@ onBeforeUnmount(() => itemPresenter.dispose())
 
     <RouterLink class="back-link" :to="{ name: 'library' }">← ライブラリへ戻る</RouterLink>
 
-    <p v-if="detailState.kind === 'loading'" class="status-message">読込中…</p>
+    <p v-if="detailState.kind === 'loading'" class="app-message app-message--info" role="status">
+      読込中…
+    </p>
 
-    <p v-else-if="detailState.kind === 'notFound'" class="status-message" role="alert">
+    <p
+      v-else-if="detailState.kind === 'notFound'"
+      class="app-message app-message--error"
+      role="alert"
+    >
       指定された作品が見つかりません。
     </p>
 
     <template v-else-if="details">
       <header class="series-header">
-        <p class="series-kind">作品</p>
+        <AppKindBadge kind="series" />
         <h1>{{ details.series.title }}</h1>
-        <p>全{{ details.episodes.length }}話</p>
+        <p class="series-header__count">全{{ details.episodes.length }}話</p>
       </header>
 
-      <p v-if="detailState.kind === 'empty'" class="status-message">
+      <p v-if="detailState.kind === 'empty'" class="app-message app-message--info">
         この作品には話が登録されていません。
       </p>
 
       <ul v-else class="episode-list">
         <li v-for="item in episodeItems" :key="item.episodeId" class="episode-item">
-          <img
-            v-if="item.thumbnailUrl"
-            class="thumbnail"
-            :src="item.thumbnailUrl"
-            :alt="`${item.title}のサムネイル`"
-          />
-          <div v-else class="thumbnail thumbnail-placeholder" aria-hidden="true">画像なし</div>
+          <div class="episode-item__thumb">
+            <AppThumbnail :src="item.thumbnailUrl" :label="item.title" />
+          </div>
           <div>
             <p v-if="item.episodeNumberLabel" class="episode-number">
               {{ item.episodeNumberLabel }}
@@ -102,48 +106,40 @@ h1 {
 
 .breadcrumb {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--app-space-2xs);
   align-items: center;
-  margin-bottom: 0.75rem;
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.875rem;
+  margin-bottom: var(--app-space-xs);
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
 }
 
 .breadcrumb a,
 .back-link {
-  color: rgb(var(--v-theme-primary));
+  color: var(--app-color-primary);
 }
 
 .back-link {
   display: inline-block;
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--app-space-md);
 }
 
 .series-header {
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--app-space-md);
 }
 
 .series-header h1 {
   margin: 0.25rem 0;
 }
 
-.series-kind,
-.series-header p,
+.series-header__count,
 .episode-number {
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.875rem;
-}
-
-.status-message {
-  padding: 1rem;
-  color: rgb(var(--v-theme-on-surface));
-  background: rgb(var(--v-theme-surface-variant));
-  border-radius: 0.5rem;
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
 }
 
 .episode-list {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--app-space-xs);
   padding: 0;
   margin: 0;
   list-style: none;
@@ -151,32 +147,20 @@ h1 {
 
 .episode-item {
   display: flex;
-  gap: 1rem;
+  gap: var(--app-space-sm);
   align-items: center;
-  padding: 0.75rem;
-  border: 1px solid rgb(var(--v-theme-outline-variant));
-  border-radius: 0.5rem;
+  padding: var(--app-space-xs);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
 }
 
 .episode-item h2 {
-  margin-top: 0.25rem;
-  font-size: 1rem;
+  margin-top: var(--app-space-3xs);
+  font-size: var(--app-font-size-md);
 }
 
-.thumbnail {
-  display: block;
+.episode-item__thumb {
   flex: 0 0 auto;
   width: 3.5rem;
-  height: 3.5rem;
-  object-fit: cover;
-  border-radius: 0.4rem;
-}
-
-.thumbnail-placeholder {
-  display: grid;
-  place-items: center;
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.75rem;
-  background: rgb(var(--v-theme-surface-variant));
 }
 </style>

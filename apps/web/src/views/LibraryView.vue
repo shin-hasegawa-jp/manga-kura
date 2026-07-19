@@ -4,6 +4,8 @@ import { RouterLink } from 'vue-router'
 import { database } from '@/database/database'
 import { createMangaRepository, type TopLevelLibraryEntry } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import AppKindBadge from '@/components/AppKindBadge.vue'
+import AppThumbnail from '@/components/AppThumbnail.vue'
 import { createLibraryListItemPresenter, type LibraryListItem } from './libraryListItemPresenter'
 import { getLibraryListState } from './libraryListState'
 
@@ -28,9 +30,11 @@ onBeforeUnmount(() => itemPresenter.dispose())
   <main>
     <h1>ライブラリ</h1>
 
-    <p v-if="libraryState.kind === 'loading'" class="status-message">読込中…</p>
+    <p v-if="libraryState.kind === 'loading'" class="app-message app-message--info" role="status">
+      読込中…
+    </p>
 
-    <p v-else-if="libraryState.kind === 'empty'" class="status-message">
+    <p v-else-if="libraryState.kind === 'empty'" class="app-message app-message--info">
       保存済みの作品や話はありません。
     </p>
 
@@ -45,15 +49,11 @@ onBeforeUnmount(() => itemPresenter.dispose())
               : undefined
           "
         >
-          <img
-            v-if="item.thumbnailUrl"
-            class="thumbnail"
-            :src="item.thumbnailUrl"
-            :alt="`${item.title}のサムネイル`"
-          />
-          <div v-else class="thumbnail thumbnail-placeholder" aria-hidden="true">画像なし</div>
+          <div class="library-item__thumb">
+            <AppThumbnail :src="item.thumbnailUrl" :label="item.title" />
+          </div>
           <div>
-            <p class="library-item__kind" :data-kind="item.kind">{{ item.kindLabel }}</p>
+            <AppKindBadge :kind="item.kind === 'series' ? 'series' : 'standalone'" />
             <h2>{{ item.title }}</h2>
             <p v-if="item.detailLabel" class="library-item__detail">{{ item.detailLabel }}</p>
           </div>
@@ -71,21 +71,13 @@ p {
 }
 
 h1 {
-  margin-bottom: 1.5rem;
-  font-size: 1.5rem;
-}
-
-.status-message {
-  padding: 1rem;
-  margin: 0;
-  color: rgb(var(--v-theme-on-surface));
-  background: rgb(var(--v-theme-surface-variant));
-  border-radius: 0.5rem;
+  margin-bottom: var(--app-space-md);
+  font-size: var(--app-font-size-xl);
 }
 
 .library-list {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--app-space-xs);
   padding: 0;
   margin: 0;
   list-style: none;
@@ -93,49 +85,33 @@ h1 {
 
 .library-item {
   display: flex;
-  gap: 1rem;
+  gap: var(--app-space-sm);
   align-items: center;
-  padding: 0.75rem;
-  border: 1px solid rgb(var(--v-theme-outline-variant));
-  border-radius: 0.5rem;
+  padding: var(--app-space-xs);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
   color: inherit;
   text-decoration: none;
 }
 
 .library-item[href]:focus-visible {
-  outline: 0.1875rem solid rgb(var(--v-theme-primary));
+  outline: 0.1875rem solid var(--app-color-primary);
   outline-offset: 0.125rem;
 }
 
 .library-item h2 {
-  margin-top: 0.25rem;
-  font-size: 1rem;
-}
-
-.library-item__kind,
-.library-item__detail {
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.875rem;
+  margin-top: var(--app-space-3xs);
+  font-size: var(--app-font-size-md);
 }
 
 .library-item__detail {
-  margin-top: 0.25rem;
+  margin-top: var(--app-space-3xs);
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
 }
 
-.thumbnail {
-  display: block;
+.library-item__thumb {
   flex: 0 0 auto;
   width: 3.5rem;
-  height: 3.5rem;
-  object-fit: cover;
-  border-radius: 0.4rem;
-}
-
-.thumbnail-placeholder {
-  display: grid;
-  place-items: center;
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.75rem;
-  background: rgb(var(--v-theme-surface-variant));
 }
 </style>
