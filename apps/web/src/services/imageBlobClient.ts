@@ -57,19 +57,11 @@ export type ImageBlobBatchFetchResult =
   | { status: 'failure'; images: []; failures: ImageBlobFetchError[] }
 
 export interface ImageBlobClientDependencies {
-  fetch: typeof fetch
   fetchProxiedImage?(proxyToken: string): Promise<ProxiedImage>
   loadBlobDimensions?(blob: Blob): Promise<{ width: number; height: number }>
 }
 
-const defaultDependencies: ImageBlobClientDependencies = {
-  fetch: (input, init) => globalThis.fetch(input, init),
-}
-
-function getImageMediaType(contentType: string): string | undefined {
-  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase()
-  return mediaType?.startsWith('image/') ? mediaType : undefined
-}
+const defaultDependencies: ImageBlobClientDependencies = {}
 
 function loadBrowserBlobDimensions(blob: Blob): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -117,8 +109,8 @@ function toApiImageFetchError(
   return new ImageBlobFetchError('network', error.message, details)
 }
 
-async function fetchApiImageBlob(
-  candidate: Extract<ImageCandidate, { acquisitionMethod: 'api' }>,
+async function fetchProxiedCandidateImage(
+  candidate: ImageCandidate,
   dependencies: ImageBlobClientDependencies,
 ): Promise<FetchedImageBlob> {
   let image: ProxiedImage
@@ -172,74 +164,7 @@ export async function fetchImageBlob(
   candidate: ImageCandidate,
   dependencies: ImageBlobClientDependencies = defaultDependencies,
 ): Promise<FetchedImageBlob> {
-  if (candidate.acquisitionMethod === 'api') {
-    return fetchApiImageBlob(candidate, dependencies)
-  }
-
-  if (candidate.width === undefined || candidate.height === undefined) {
-    throw new ImageBlobFetchError('missingDimensions', '画像の幅と高さを取得できませんでした。', {
-      candidateId: candidate.id,
-      imageUrl: candidate.imageUrl,
-    })
-  }
-
-  let response: Response
-
-  try {
-    response = await dependencies.fetch(candidate.imageUrl)
-  } catch {
-    throw new ImageBlobFetchError('network', '画像へ接続できませんでした。', {
-      candidateId: candidate.id,
-      imageUrl: candidate.imageUrl,
-    })
-  }
-
-  if (!response.ok) {
-    throw new ImageBlobFetchError(
-      'http',
-      `画像の取得に失敗しました。HTTPステータス: ${response.status}`,
-      {
-        candidateId: candidate.id,
-        imageUrl: candidate.imageUrl,
-        status: response.status,
-      },
-    )
-  }
-
-  const contentType = response.headers.get('content-type') ?? ''
-  const mimeType = getImageMediaType(contentType)
-  if (mimeType === undefined) {
-    throw new ImageBlobFetchError(
-      'unsupportedContentType',
-      '取得したデータは画像ではありません。',
-      {
-        candidateId: candidate.id,
-        imageUrl: candidate.imageUrl,
-        contentType,
-      },
-    )
-  }
-
-  let blob: Blob
-  try {
-    blob = await response.blob()
-  } catch {
-    throw new ImageBlobFetchError('network', '画像データの読み込みに失敗しました。', {
-      candidateId: candidate.id,
-      imageUrl: candidate.imageUrl,
-    })
-  }
-
-  return {
-    candidateId: candidate.id,
-    domOrder: candidate.domOrder,
-    blob,
-    sourceUrl: candidate.imageUrl,
-    mimeType,
-    fileSize: blob.size,
-    width: candidate.width,
-    height: candidate.height,
-  }
+  return fetchProxiedCandidateImage(candidate, dependencies)
 }
 
 export async function fetchSelectedImageBlobs(

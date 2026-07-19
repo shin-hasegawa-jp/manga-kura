@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { AcquisitionApiClientError } from '@/services/acquisitionApiClient'
 import { ImageBlobFetchError, type ImageBlobFetchErrorKind } from '@/services/imageBlobClient'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
-import { PageHtmlFetchError } from '@/services/pageHtmlClient'
 import {
   getPageAnalysisErrorPresentation,
   getSaveErrorPresentation,
@@ -18,7 +18,8 @@ function createCandidate(id: string, domOrder: number): ImageCandidate {
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus: 'loaded',
-    acquisitionMethod: 'direct',
+    proxyToken: `proxy-token-${id}`,
+    previewToken: `preview-token-${id}`,
     width: 800,
     height: 1200,
   }
@@ -36,24 +37,56 @@ describe('取得失敗のエラー表示', () => {
   })
 
   it.each([
-    ['通信・CORS失敗', new PageHtmlFetchError('network', '通信失敗'), 'CORS設定または通信状態'],
-    ['HTTPエラー', new PageHtmlFetchError('http', 'HTTP失敗', { status: 404 }), 'HTTP 404'],
     [
-      'HTML以外',
-      new PageHtmlFetchError('unsupportedContentType', '形式不一致', {
+      '通信失敗',
+      new AcquisitionApiClientError('network', '通信失敗'),
+      'ページ解析APIへ接続できませんでした',
+    ],
+    [
+      'APIエラー',
+      new AcquisitionApiClientError('api', '取得先でエラーが発生しました。', {
+        status: 404,
+        retryable: true,
+      }),
+      'HTTP 404',
+    ],
+    [
+      '対応していない形式',
+      new AcquisitionApiClientError('unsupportedContentType', '形式不一致', {
         contentType: 'application/json',
       }),
-      'HTMLではありません（application/json）',
+      '対応していない形式が返されました（application/json）',
+    ],
+    [
+      '不正レスポンス',
+      new AcquisitionApiClientError('invalidResponse', '形式不正'),
+      '不正なレスポンス',
     ],
   ])('%sを原因別の文言へ変換する', (_caseName, cause, expectedMessage) => {
     expect(
       getPageAnalysisErrorPresentation({
         status: 'failure',
-        kind: 'html-fetch-failed',
+        kind: 'api-analysis-failed',
         message: cause.message,
         cause,
       }),
     ).toEqual(expect.objectContaining({ message: expect.stringContaining(expectedMessage) }))
+  })
+
+  it('再試行できないAPIエラーでは再試行不可として表示する', () => {
+    const cause = new AcquisitionApiClientError('api', 'URLが許可されていません。', {
+      status: 400,
+      retryable: false,
+    })
+
+    expect(
+      getPageAnalysisErrorPresentation({
+        status: 'failure',
+        kind: 'api-analysis-failed',
+        message: cause.message,
+        cause,
+      }),
+    ).toEqual({ message: 'URLが許可されていません。（HTTP 400）', canRetry: false })
   })
 
   it('候補なしを再解析可能な空状態として表示する', () => {
@@ -61,7 +94,6 @@ describe('取得失敗のエラー表示', () => {
       getPageAnalysisErrorPresentation({
         status: 'empty',
         pageUrl: 'https://example.com/',
-        acquisitionMethod: 'direct',
       }),
     ).toEqual({
       message: 'このページから画像候補を抽出できませんでした。URLを確認して再解析できます。',
@@ -91,14 +123,14 @@ describe('取得失敗のエラー表示', () => {
       ),
     ).toEqual({
       message:
-        '候補 2（HTTP 403）を取得できなかったため保存を中断しました。選択内容を保持したまま再試行できます。',
+        '候補 2（画像中継API HTTP 403）を取得できなかったため保存を中断しました。選択内容を保持したまま再試行できます。',
       canRetry: true,
     })
   })
 
   const imageFailureCases: [ImageBlobFetchErrorKind, undefined, string][] = [
-    ['network', undefined, '通信またはCORSエラー'],
-    ['unsupportedContentType', undefined, '画像以外のContent-Type'],
+    ['network', undefined, '画像中継APIの通信エラー'],
+    ['unsupportedContentType', undefined, '画像中継APIから画像以外のデータを受信'],
     ['missingDimensions', undefined, '画像サイズ取得失敗'],
   ]
 

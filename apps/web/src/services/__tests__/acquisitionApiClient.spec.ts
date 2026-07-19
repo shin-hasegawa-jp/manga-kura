@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  AcquisitionApiClientError,
   analyzePageViaApi,
   fetchProxiedImage,
   type AcquisitionApiClientDependencies,
 } from '../acquisitionApiClient'
-import { toImageBlobFetchError, toPageHtmlFetchError } from '../acquisitionApiErrorAdapters'
 
 const apiBaseUrl = 'https://api.example.com/base/'
 
@@ -149,50 +147,5 @@ describe('取得APIクライアント', () => {
       kind: 'api',
       code: 'upstream_timeout',
     })
-  })
-
-  it('取得APIエラーを既存のページ取得エラーへ変換する', () => {
-    const error = new AcquisitionApiClientError('api', '取得できません。', {
-      status: 429,
-      code: 'rate_limited',
-    })
-
-    expect(toPageHtmlFetchError(error)).toMatchObject({
-      name: 'PageHtmlFetchError',
-      kind: 'http',
-      status: 429,
-    })
-  })
-
-  it('取得APIエラーを既存の画像取得エラーへ変換する', () => {
-    const error = new AcquisitionApiClientError('unsupportedContentType', '画像ではありません。', {
-      contentType: 'text/html',
-    })
-
-    expect(
-      toImageBlobFetchError(error, {
-        id: 'image-candidate-1',
-        imageUrl: 'https://example.com/001.jpg',
-      }),
-    ).toMatchObject({
-      name: 'ImageBlobFetchError',
-      kind: 'unsupportedContentType',
-      candidateId: 'image-candidate-1',
-      contentType: 'text/html',
-    })
-  })
-
-  it('不正レスポンスを既存のネットワーク取得エラーへ変換する', () => {
-    const error = new AcquisitionApiClientError('invalidResponse', '形式が不正です。', {
-      status: 200,
-    })
-
-    expect(toPageHtmlFetchError(error)).toMatchObject({ kind: 'network' })
-    expect(
-      toImageBlobFetchError(error, {
-        id: 'image-candidate-1',
-        imageUrl: 'https://example.com/001.jpg',
-      }),
-    ).toMatchObject({ kind: 'network' })
   })
 })

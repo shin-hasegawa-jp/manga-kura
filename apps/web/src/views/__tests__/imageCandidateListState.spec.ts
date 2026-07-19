@@ -12,7 +12,8 @@ function createCandidate(fetchStatus: ImageCandidate['fetchStatus'] = 'loaded'):
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus,
-    acquisitionMethod: 'direct',
+    proxyToken: 'proxy-token',
+    previewToken: 'preview-token',
     width: fetchStatus === 'loaded' ? 800 : undefined,
     height: fetchStatus === 'loaded' ? 1200 : undefined,
   }
@@ -32,12 +33,10 @@ describe('画像候補一覧の表示状態', () => {
       getImageCandidateListState({
         status: 'empty',
         pageUrl: 'https://example.com/comic/',
-        acquisitionMethod: 'direct',
       }),
     ).toEqual({
       kind: 'empty',
       pageUrl: 'https://example.com/comic/',
-      acquisitionMethod: 'direct',
       message: 'このページから画像候補を抽出できませんでした。URLを確認して再解析できます。',
     })
   })
@@ -46,7 +45,7 @@ describe('画像候補一覧の表示状態', () => {
     expect(
       getImageCandidateListState({
         status: 'failure',
-        kind: 'html-fetch-failed',
+        kind: 'api-analysis-failed',
         message: 'ページを取得できませんでした。',
       }),
     ).toEqual({ kind: 'failure', message: 'ページを取得できませんでした。' })
@@ -59,25 +58,12 @@ describe('画像候補一覧の表示状態', () => {
       getImageCandidateListState({
         status: 'success',
         pageUrl: 'https://example.com/comic/',
-        acquisitionMethod: 'direct',
         candidates,
       }),
     ).toEqual({
       kind: 'populated',
       pageUrl: 'https://example.com/comic/',
-      acquisitionMethod: 'direct',
       candidates,
     })
-  })
-
-  it('API経由の解析結果を表示用状態へ保持する', () => {
-    expect(
-      getImageCandidateListState({
-        status: 'success',
-        pageUrl: 'https://example.com/comic/',
-        acquisitionMethod: 'api',
-        candidates: [],
-      }),
-    ).toMatchObject({ kind: 'populated', acquisitionMethod: 'api' })
   })
 })
