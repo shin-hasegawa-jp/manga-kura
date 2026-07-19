@@ -68,13 +68,12 @@ onBeforeUnmount(() => itemPresenter.dispose())
     <ul v-else class="library-grid">
       <li v-for="item in libraryItems" :key="item.itemId">
         <component
-          :is="item.kind === 'series' ? RouterLink : 'div'"
-          class="library-card"
-          :class="{ 'library-card--link': item.kind === 'series' }"
+          :is="RouterLink"
+          class="library-card library-card--link"
           :to="
             item.kind === 'series'
               ? { name: 'seriesDetail', params: { seriesId: item.itemId } }
-              : undefined
+              : { name: 'reader', params: { episodeId: item.itemId } }
           "
         >
           <div class="library-card__thumb">

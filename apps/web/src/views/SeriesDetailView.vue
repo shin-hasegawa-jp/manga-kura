@@ -97,16 +97,21 @@ onBeforeUnmount(() => itemPresenter.dispose())
       </div>
 
       <ul v-else class="episode-list">
-        <li v-for="item in episodeItems" :key="item.episodeId" class="episode-item">
-          <div class="episode-item__thumb">
-            <AppThumbnail :src="item.thumbnailUrl" :label="item.title" />
-          </div>
-          <h3 class="episode-item__title">
-            <span v-if="item.episodeNumberLabel" class="episode-item__number">
-              {{ item.episodeNumberLabel }}
-            </span>
-            {{ item.title }}
-          </h3>
+        <li v-for="item in episodeItems" :key="item.episodeId">
+          <RouterLink
+            class="episode-item"
+            :to="{ name: 'reader', params: { episodeId: item.episodeId } }"
+          >
+            <div class="episode-item__thumb">
+              <AppThumbnail :src="item.thumbnailUrl" :label="item.title" />
+            </div>
+            <h3 class="episode-item__title">
+              <span v-if="item.episodeNumberLabel" class="episode-item__number">
+                {{ item.episodeNumberLabel }}
+              </span>
+              {{ item.title }}
+            </h3>
+          </RouterLink>
         </li>
       </ul>
     </template>
@@ -168,6 +173,8 @@ onBeforeUnmount(() => itemPresenter.dispose())
   gap: var(--app-space-sm);
   align-items: center;
   padding: var(--app-space-xs) 0;
+  color: inherit;
+  text-decoration: none;
   border-bottom: 1px solid var(--app-color-border);
 }
 

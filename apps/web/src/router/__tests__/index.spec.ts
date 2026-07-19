@@ -6,7 +6,6 @@ describe('アプリケーションルーター', () => {
   it.each([
     ['/', 'library'],
     ['/save', 'save'],
-    ['/reader', 'reader'],
     ['/storage', 'storage'],
     ['/settings', 'settings'],
   ])('%s を %s ルートとして解決する', async (path, routeName) => {
@@ -26,6 +25,16 @@ describe('アプリケーションルーター', () => {
 
     expect(router.currentRoute.value.name).toBe('seriesDetail')
     expect(router.currentRoute.value.params).toEqual({ seriesId: 'development-series-1' })
+  })
+
+  it('話IDを含むURLを漫画閲覧ルートとして解決する', async () => {
+    const router = createAppRouter(createMemoryHistory())
+
+    await router.push('/reader/episode-1')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('reader')
+    expect(router.currentRoute.value.params).toEqual({ episodeId: 'episode-1' })
   })
 
   it('作品IDを含まない作品URLをライブラリへリダイレクトする', async () => {

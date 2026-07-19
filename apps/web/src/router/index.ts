@@ -23,7 +23,7 @@ export function createAppRouter(
         component: () => import('../views/SeriesDetailView.vue'),
       },
       {
-        path: '/reader',
+        path: '/reader/:episodeId',
         name: 'reader',
         component: () => import('../views/ReaderView.vue'),
       },
