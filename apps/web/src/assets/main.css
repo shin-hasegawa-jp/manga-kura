@@ -1,3 +1,13 @@
+:root {
+  /* 本文=ゴシック（Noto Sans JP）／見出し=明朝（Noto Serif JP）。取得失敗時はシステムフォントへフォールバック */
+  --app-font-family-sans:
+    'Noto Sans JP', system-ui, -apple-system, 'Hiragino Kaku Gothic ProN',
+    'Hiragino Sans', 'Yu Gothic UI', Meiryo, sans-serif;
+  --app-font-family-serif:
+    'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho',
+    'MS Mincho', serif;
+}
+
 html {
   min-width: 20rem;
   background: rgb(var(--v-theme-background));
@@ -6,6 +16,7 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
+  font-family: var(--app-font-family-sans);
 }
 
 #app {
