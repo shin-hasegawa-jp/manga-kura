@@ -1,0 +1,80 @@
+/**
+ * 共通デザイントークン（納品デザイン基調）
+ *
+ * 画面ごとに色値・寸法を直接書かず、ここで定義したトークンを参照する。
+ * 色はVuetifyテーマ変数（--v-theme-*）を経由するため、ダークテーマを追加しても
+ * 各トークンの参照側を変更せずに追従できる（色の責務をテーマ側へ集約）。
+ */
+
+:root {
+  /* ---- フォント（取得失敗時はシステムフォントへフォールバック） ---- */
+  --app-font-family-sans:
+    'Noto Sans JP', system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans',
+    'Yu Gothic UI', Meiryo, sans-serif;
+  --app-font-family-serif:
+    'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', 'YuMincho', 'MS Mincho', serif;
+
+  /* ---- タイポグラフィ ---- */
+  --app-font-size-display: 2rem; /* 画面タイトル（明朝） */
+  --app-font-size-xl: 1.5rem;
+  --app-font-size-lg: 1.25rem; /* セクション見出し */
+  --app-font-size-md: 1rem; /* 本文 */
+  --app-font-size-sm: 0.875rem; /* 補助テキスト */
+  --app-font-size-xs: 0.75rem; /* ラベル・ナビゲーション */
+
+  --app-font-weight-normal: 400;
+  --app-font-weight-medium: 500;
+  --app-font-weight-semibold: 600;
+  --app-font-weight-bold: 700;
+
+  --app-line-height-tight: 1.25;
+  --app-line-height-heading: 1.4;
+  --app-line-height-body: 1.7;
+
+  /* ---- 余白（4pxベース） ---- */
+  --app-space-3xs: 0.25rem;
+  --app-space-2xs: 0.5rem;
+  --app-space-xs: 0.75rem;
+  --app-space-sm: 1rem;
+  --app-space-md: 1.5rem;
+  --app-space-lg: 2rem;
+  --app-space-xl: 3rem;
+
+  /* 画面外周のコンテンツ余白 */
+  --app-content-padding-inline: 1.25rem;
+  --app-content-max-width: 30rem;
+
+  /* ---- 角丸 ---- */
+  --app-radius-sm: 0.5rem;
+  --app-radius-md: 0.75rem;
+  --app-radius-lg: 1rem;
+  --app-radius-xl: 1.5rem;
+  --app-radius-pill: 999px;
+
+  /* ---- 影 ---- */
+  --app-shadow-sm: 0 0.0625rem 0.125rem rgb(0 0 0 / 6%);
+  --app-shadow-md: 0 0.25rem 0.75rem rgb(0 0 0 / 8%);
+  --app-shadow-lg: 0 0.5rem 1.5rem rgb(0 0 0 / 12%);
+
+  /* ---- 色（Vuetifyテーマ変数を経由。ダークテーマ追加時も参照側は不変） ---- */
+  --app-color-bg: rgb(var(--v-theme-background));
+  --app-color-surface: rgb(var(--v-theme-surface));
+  --app-color-panel: rgb(var(--v-theme-surface-variant));
+
+  --app-color-text: rgb(var(--v-theme-on-surface));
+  --app-color-text-muted: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+  --app-color-text-subtle: rgba(var(--v-theme-on-surface), var(--v-disabled-opacity));
+  --app-color-border: rgba(var(--v-theme-on-surface), 0.12);
+
+  /* 主要アクセント（選択状態・ステップ・リンク・進捗） */
+  --app-color-primary: rgb(var(--v-theme-primary));
+  --app-color-on-primary: rgb(var(--v-theme-on-primary));
+
+  /* 主要アクション（ニアブラックの塗りボタン） */
+  --app-color-cta: rgb(var(--v-theme-cta));
+  --app-color-on-cta: rgb(var(--v-theme-on-cta));
+
+  --app-color-error: rgb(var(--v-theme-error));
+  --app-color-on-error: rgb(var(--v-theme-on-error));
+  --app-color-success: rgb(var(--v-theme-success));
+}

@@ -4,6 +4,7 @@ import '@fontsource/noto-sans-jp/700.css'
 import '@fontsource/noto-serif-jp/600.css'
 import '@fontsource/noto-serif-jp/700.css'
 
+import './assets/tokens.css'
 import './assets/main.css'
 
 import { createApp } from 'vue'
