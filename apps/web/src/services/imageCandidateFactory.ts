@@ -1,8 +1,3 @@
-import {
-  resolveImageSourceCandidates,
-  type ImageSourceAttribute,
-  type ImageSourceExtractorDependencies,
-} from './imageSourceExtractor'
 import type { ApiImageCandidate } from './acquisitionApiSchemas'
 
 export type ImageCandidateFetchStatus = 'idle' | 'loading' | 'loaded' | 'failed'
@@ -18,43 +13,19 @@ export type ImageCandidateSelectionReason =
   | 'decorative-filename'
   | 'image-load-failed'
 
-interface ImageCandidateBase {
+export interface ImageCandidate {
   id: string
   domOrder: number
   imageUrl: string
-  sourceAttribute: ImageSourceAttribute
+  sourceAttribute: ApiImageCandidate['sourceAttribute']
   isSelected: boolean
   score: number
   selectionReasons: ImageCandidateSelectionReason[]
   fetchStatus: ImageCandidateFetchStatus
   width?: number
   height?: number
-}
-
-export type ImageCandidate = ImageCandidateBase &
-  (
-    | { acquisitionMethod: 'direct' }
-    | { acquisitionMethod: 'api'; proxyToken: string; previewToken: string }
-  )
-
-export function createImageCandidates(
-  html: string,
-  pageUrl: string,
-  extractorDependencies?: ImageSourceExtractorDependencies,
-): ImageCandidate[] {
-  return resolveImageSourceCandidates(html, pageUrl, extractorDependencies).map(
-    ({ source, attribute }, domOrder) => ({
-      id: `image-candidate-${domOrder}`,
-      domOrder,
-      imageUrl: source,
-      sourceAttribute: attribute,
-      isSelected: false,
-      score: 0,
-      selectionReasons: [],
-      fetchStatus: 'idle',
-      acquisitionMethod: 'direct',
-    }),
-  )
+  proxyToken: string
+  previewToken: string
 }
 
 export function createApiImageCandidates(
@@ -62,7 +33,6 @@ export function createApiImageCandidates(
 ): ImageCandidate[] {
   return candidates.map((candidate) => ({
     ...candidate,
-    acquisitionMethod: 'api',
     isSelected: false,
     score: 0,
     selectionReasons: [],

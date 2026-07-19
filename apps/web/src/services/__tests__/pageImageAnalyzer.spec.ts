@@ -70,11 +70,9 @@ describe('ページ画像解析フロー', () => {
     ).resolves.toEqual({
       status: 'success',
       pageUrl,
-      acquisitionMethod: 'api',
       candidates: [
         expect.objectContaining({
           id: 'image-candidate-0',
-          acquisitionMethod: 'api',
           proxyToken: 'signed-token',
           previewToken: 'preview-token',
         }),
@@ -93,7 +91,6 @@ describe('ページ画像解析フロー', () => {
     await expect(analyzePageImages(pageUrl, dependencies)).resolves.toEqual({
       status: 'empty',
       pageUrl,
-      acquisitionMethod: 'api',
     })
     expect(dependencies.analyzeViaApi).toHaveBeenCalledOnce()
     expect(dependencies.createApiCandidates).toHaveBeenCalledOnce()

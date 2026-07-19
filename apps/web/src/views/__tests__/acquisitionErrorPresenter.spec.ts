@@ -18,7 +18,8 @@ function createCandidate(id: string, domOrder: number): ImageCandidate {
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus: 'loaded',
-    acquisitionMethod: 'direct',
+    proxyToken: `proxy-token-${id}`,
+    previewToken: `preview-token-${id}`,
     width: 800,
     height: 1200,
   }
@@ -61,7 +62,6 @@ describe('取得失敗のエラー表示', () => {
       getPageAnalysisErrorPresentation({
         status: 'empty',
         pageUrl: 'https://example.com/',
-        acquisitionMethod: 'direct',
       }),
     ).toEqual({
       message: 'このページから画像候補を抽出できませんでした。URLを確認して再解析できます。',

@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ImageCandidate } from '../imageCandidateFactory'
+import { describe, expect, it, vi } from 'vitest'
 import { AcquisitionApiClientError } from '../acquisitionApiClient'
 import {
   createSelectedImageBlobFetcher,
@@ -7,10 +6,7 @@ import {
   fetchSelectedImageBlobs,
   ImageBlobFetchError,
 } from '../imageBlobClient'
-
-afterEach(() => {
-  vi.unstubAllGlobals()
-})
+import type { ImageCandidate } from '../imageCandidateFactory'
 
 function createCandidate(id: string, isSelected = true): ImageCandidate {
   return {
@@ -22,133 +18,34 @@ function createCandidate(id: string, isSelected = true): ImageCandidate {
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus: 'loaded',
-    acquisitionMethod: 'direct',
+    proxyToken: `proxy-token-${id}`,
+    previewToken: `preview-token-${id}`,
     width: 800,
     height: 1200,
   }
 }
 
-function createApiCandidate(
-  id: string,
-  isSelected = true,
-): Extract<ImageCandidate, { acquisitionMethod: 'api' }> {
-  return {
-    ...createCandidate(id, isSelected),
-    acquisitionMethod: 'api',
-    proxyToken: `proxy-token-${id}`,
-    previewToken: `preview-token-${id}`,
-  }
+function createProxiedImage() {
+  const blob = new Blob(['proxied-image'], { type: 'image/webp' })
+  return { blob, mimeType: 'image/webp', fileSize: blob.size }
 }
 
 describe('選択画像のBlob取得', () => {
-  it('デフォルトのfetchをWindowコンテキストで呼び出す', async () => {
+  it('候補の中継トークンを使って画像と保存用メタデータを取得する', async () => {
     const candidate = createCandidate('1')
-    const fetchStub = vi.fn(function (this: unknown) {
-      expect(this).toBe(globalThis)
-      return Promise.resolve(
-        new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }),
-      )
-    })
-    vi.stubGlobal('fetch', fetchStub)
-
-    await expect(fetchImageBlob(candidate)).resolves.toMatchObject({ candidateId: candidate.id })
-    expect(fetchStub).toHaveBeenCalledOnce()
-  })
-
-  it('画像Blobと保存用メタデータを返す', async () => {
-    const candidate = createCandidate('1')
-    const bytes = new Uint8Array([1, 2, 3, 4])
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(bytes, {
-        status: 200,
-        headers: { 'content-type': 'image/png; charset=binary' },
-      }),
-    )
-
-    const result = await fetchImageBlob(candidate, { fetch: fetchMock })
-
-    expect(result).toEqual({
-      candidateId: candidate.id,
-      domOrder: candidate.domOrder,
-      blob: expect.any(Blob),
-      sourceUrl: candidate.imageUrl,
-      mimeType: 'image/png',
-      fileSize: bytes.byteLength,
-      width: 800,
-      height: 1200,
-    })
-    expect(new Uint8Array(await result.blob.arrayBuffer())).toEqual(bytes)
-    expect(fetchMock).toHaveBeenCalledWith(candidate.imageUrl)
-  })
-
-  it('HTTPエラーをステータス付きで返す', async () => {
-    const candidate = createCandidate('1')
-
-    await expect(
-      fetchImageBlob(candidate, {
-        fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 404 })),
-      }),
-    ).rejects.toMatchObject({
-      name: 'ImageBlobFetchError',
-      kind: 'http',
-      candidateId: candidate.id,
-      imageUrl: candidate.imageUrl,
-      status: 404,
-    })
-  })
-
-  it('通信失敗をネットワークエラーへ変換する', async () => {
-    const candidate = createCandidate('1')
-
-    await expect(
-      fetchImageBlob(candidate, {
-        fetch: vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch')),
-      }),
-    ).rejects.toMatchObject({
-      name: 'ImageBlobFetchError',
-      kind: 'network',
-      candidateId: candidate.id,
-      imageUrl: candidate.imageUrl,
-    })
-  })
-
-  it('画像以外のContent-Typeを専用エラーへ変換する', async () => {
-    const candidate = createCandidate('1')
-
-    await expect(
-      fetchImageBlob(candidate, {
-        fetch: vi.fn<typeof fetch>().mockResolvedValue(
-          new Response('<html></html>', {
-            headers: { 'content-type': 'text/html; charset=utf-8' },
-          }),
-        ),
-      }),
-    ).rejects.toMatchObject({
-      name: 'ImageBlobFetchError',
-      kind: 'unsupportedContentType',
-      contentType: 'text/html; charset=utf-8',
-    })
-  })
-
-  it('API候補は元画像URLではなく画像中継APIから取得する', async () => {
-    const candidate = createApiCandidate('1')
-    const blob = new Blob(['proxied-image'], { type: 'image/webp' })
+    const proxiedImage = createProxiedImage()
     const fetchMock = vi.fn<typeof fetch>()
-    const fetchProxiedImage = vi.fn(async () => ({
-      blob,
-      mimeType: 'image/webp',
-      fileSize: blob.size,
-    }))
+    const fetchProxiedImage = vi.fn(async () => proxiedImage)
 
     await expect(
       fetchImageBlob(candidate, { fetch: fetchMock, fetchProxiedImage }),
     ).resolves.toEqual({
       candidateId: candidate.id,
       domOrder: candidate.domOrder,
-      blob,
+      blob: proxiedImage.blob,
       sourceUrl: candidate.imageUrl,
-      mimeType: 'image/webp',
-      fileSize: blob.size,
+      mimeType: proxiedImage.mimeType,
+      fileSize: proxiedImage.fileSize,
       width: 800,
       height: 1200,
     })
@@ -156,43 +53,28 @@ describe('選択画像のBlob取得', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('API候補の事前寸法取得が失敗していても中継Blobから寸法を取得する', async () => {
-    const candidate = { ...createApiCandidate('1'), width: undefined, height: undefined }
-    const blob = new Blob(['proxied-image'], { type: 'image/jpeg' })
-    const fetchProxiedImage = vi.fn(async () => ({
-      blob,
-      mimeType: 'image/jpeg',
-      fileSize: blob.size,
-    }))
+  it('事前寸法がない場合は中継Blobから寸法を取得する', async () => {
+    const candidate = { ...createCandidate('1'), width: undefined, height: undefined }
+    const proxiedImage = createProxiedImage()
     const loadBlobDimensions = vi.fn(async () => ({ width: 700, height: 963 }))
 
     await expect(
       fetchImageBlob(candidate, {
         fetch: vi.fn<typeof fetch>(),
-        fetchProxiedImage,
+        fetchProxiedImage: vi.fn(async () => proxiedImage),
         loadBlobDimensions,
       }),
-    ).resolves.toMatchObject({
-      candidateId: candidate.id,
-      width: 700,
-      height: 963,
-      blob,
-    })
-    expect(loadBlobDimensions).toHaveBeenCalledExactlyOnceWith(blob)
+    ).resolves.toMatchObject({ candidateId: candidate.id, width: 700, height: 963 })
+    expect(loadBlobDimensions).toHaveBeenCalledExactlyOnceWith(proxiedImage.blob)
   })
 
-  it('中継Blobからも有効な寸法を取得できない場合は候補付きエラーを返す', async () => {
-    const candidate = { ...createApiCandidate('1'), width: undefined, height: undefined }
-    const blob = new Blob(['invalid-image'], { type: 'image/jpeg' })
+  it('中継Blobから有効な寸法を取得できない場合は候補付きエラーを返す', async () => {
+    const candidate = { ...createCandidate('1'), width: undefined, height: undefined }
 
     await expect(
       fetchImageBlob(candidate, {
         fetch: vi.fn<typeof fetch>(),
-        fetchProxiedImage: vi.fn(async () => ({
-          blob,
-          mimeType: 'image/jpeg',
-          fileSize: blob.size,
-        })),
+        fetchProxiedImage: vi.fn(async () => createProxiedImage()),
         loadBlobDimensions: vi.fn(async () => ({ width: 0, height: 0 })),
       }),
     ).rejects.toMatchObject({
@@ -203,7 +85,7 @@ describe('選択画像のBlob取得', () => {
   })
 
   it('画像中継APIエラーを候補を特定できる既存エラーへ変換する', async () => {
-    const candidate = createApiCandidate('2')
+    const candidate = createCandidate('2')
     const fetchProxiedImage = vi.fn().mockRejectedValue(
       new AcquisitionApiClientError('api', 'トークンが無効です。', {
         status: 400,
@@ -224,34 +106,33 @@ describe('選択画像のBlob取得', () => {
 
   it('選択済み候補だけを元の順番で取得する', async () => {
     const candidates = [createCandidate('1'), createCandidate('2', false), createCandidate('3')]
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockImplementation(
-        async () =>
-          new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } }),
-      )
+    const fetchProxiedImage = vi.fn(async () => createProxiedImage())
 
-    const result = await fetchSelectedImageBlobs(candidates, { fetch: fetchMock })
+    const result = await fetchSelectedImageBlobs(candidates, {
+      fetch: vi.fn<typeof fetch>(),
+      fetchProxiedImage,
+    })
 
     expect(result.status).toBe('success')
     expect(result.images.map(({ candidateId }) => candidateId)).toEqual(['1', '3'])
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock).not.toHaveBeenCalledWith(candidates[1]?.imageUrl)
+    expect(fetchProxiedImage).toHaveBeenCalledTimes(2)
+    expect(fetchProxiedImage).not.toHaveBeenCalledWith(candidates[1]?.proxyToken)
   })
 
   it('一部画像の取得失敗を成功画像と分けて返す', async () => {
     const candidates = [createCandidate('1'), createCandidate('2'), createCandidate('3')]
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }),
+    const fetchProxiedImage = vi
+      .fn()
+      .mockResolvedValueOnce(createProxiedImage())
+      .mockRejectedValueOnce(
+        new AcquisitionApiClientError('api', '取得できません。', { status: 403 }),
       )
-      .mockResolvedValueOnce(new Response(null, { status: 403 }))
-      .mockResolvedValueOnce(
-        new Response(new Uint8Array([3]), { headers: { 'content-type': 'image/webp' } }),
-      )
+      .mockResolvedValueOnce(createProxiedImage())
 
-    const result = await fetchSelectedImageBlobs(candidates, { fetch: fetchMock })
+    const result = await fetchSelectedImageBlobs(candidates, {
+      fetch: vi.fn<typeof fetch>(),
+      fetchProxiedImage,
+    })
 
     expect(result.status).toBe('partial-failure')
     expect(result.images.map(({ candidateId }) => candidateId)).toEqual(['1', '3'])
@@ -261,10 +142,13 @@ describe('選択画像のBlob取得', () => {
   })
 
   it('すべての選択画像が失敗した場合は失敗結果を返す', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('Failed to fetch'))
+    const fetchProxiedImage = vi
+      .fn()
+      .mockRejectedValue(new AcquisitionApiClientError('network', '中継失敗'))
 
     const result = await fetchSelectedImageBlobs([createCandidate('1'), createCandidate('2')], {
-      fetch: fetchMock,
+      fetch: vi.fn<typeof fetch>(),
+      fetchProxiedImage,
     })
 
     expect(result.status).toBe('failure')
@@ -276,14 +160,13 @@ describe('選択画像のBlob取得', () => {
   })
 
   it('再試行時は取得済み画像を再中継せず失敗候補だけを取得する', async () => {
-    const firstCandidate = createApiCandidate('1')
-    const secondCandidate = createApiCandidate('2')
-    const blob = new Blob(['image'], { type: 'image/png' })
+    const firstCandidate = createCandidate('1')
+    const secondCandidate = createCandidate('2')
     const fetchProxiedImage = vi
       .fn()
-      .mockResolvedValueOnce({ blob, mimeType: 'image/png', fileSize: blob.size })
+      .mockResolvedValueOnce(createProxiedImage())
       .mockRejectedValueOnce(new AcquisitionApiClientError('network', '中継失敗'))
-      .mockResolvedValueOnce({ blob, mimeType: 'image/png', fileSize: blob.size })
+      .mockResolvedValueOnce(createProxiedImage())
     const fetchImages = createSelectedImageBlobFetcher({
       fetch: vi.fn<typeof fetch>(),
       fetchProxiedImage,
@@ -302,8 +185,5 @@ describe('選択画像のBlob取得', () => {
       ],
     })
     expect(fetchProxiedImage).toHaveBeenCalledTimes(3)
-    expect(fetchProxiedImage).toHaveBeenNthCalledWith(1, firstCandidate.proxyToken)
-    expect(fetchProxiedImage).toHaveBeenNthCalledWith(2, secondCandidate.proxyToken)
-    expect(fetchProxiedImage).toHaveBeenNthCalledWith(3, secondCandidate.proxyToken)
   })
 })

@@ -17,7 +17,8 @@ function createCandidate(id: string, isSelected = false): ImageCandidate {
     score: 0,
     selectionReasons: [],
     fetchStatus: 'loaded',
-    acquisitionMethod: 'direct',
+    proxyToken: `proxy-token-${id}`,
+    previewToken: `preview-token-${id}`,
     width: 800,
     height: 1200,
   }

@@ -87,9 +87,7 @@ async function analyzePageUrl() {
 }
 
 function getCandidatePreviewUrl(candidate: ImageCandidate): string {
-  return candidate.acquisitionMethod === 'api'
-    ? createProxiedImageUrl(candidate.previewToken)
-    : candidate.imageUrl
+  return createProxiedImageUrl(candidate.previewToken)
 }
 
 function getCurrentRegistrationDetails(): AnalyzedPageRegistrationDetails {
@@ -273,11 +271,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
         {{ imageCandidateListState.message }}
       </p>
       <template v-else-if="imageCandidateListState.kind === 'populated'">
-        <p
-          v-if="imageCandidateListState.acquisitionMethod === 'api'"
-          class="image-candidates__acquisition-method"
-          role="status"
-        >
+        <p class="image-candidates__acquisition-method" role="status">
           このページは取得API経由で解析しました。
         </p>
         <div class="image-candidates__selection-actions" aria-label="画像候補の一括選択">

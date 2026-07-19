@@ -19,18 +19,10 @@ function createCandidate(isSelected = true): ImageCandidate {
     score: 90,
     selectionReasons: ['sequential-filename'],
     fetchStatus: 'loaded',
-    acquisitionMethod: 'direct',
-    width: 800,
-    height: 1200,
-  }
-}
-
-function createApiCandidate(): Extract<ImageCandidate, { acquisitionMethod: 'api' }> {
-  return {
-    ...createCandidate(),
-    acquisitionMethod: 'api',
     proxyToken: 'proxy-token',
     previewToken: 'preview-token',
+    width: 800,
+    height: 1200,
   }
 }
 
@@ -90,7 +82,6 @@ const invalidSaveCases: InvalidSaveCase[] = [
     analysisState: {
       status: 'success',
       pageUrl: validDetails.sourcePageUrl,
-      acquisitionMethod: 'direct',
       candidates: [createCandidate(false)],
     },
     details: validDetails,
@@ -101,7 +92,6 @@ const invalidSaveCases: InvalidSaveCase[] = [
     analysisState: {
       status: 'success',
       pageUrl: validDetails.sourcePageUrl,
-      acquisitionMethod: 'direct',
       candidates: [createCandidate()],
     },
     details: { ...validDetails, seriesTitle: '' },
@@ -133,7 +123,6 @@ describe('解析済みページの保存フロー', () => {
         {
           status: 'success',
           pageUrl: validDetails.sourcePageUrl,
-          acquisitionMethod: 'direct',
           candidates: [candidate],
         },
         validDetails,
@@ -170,7 +159,7 @@ describe('解析済みページの保存フロー', () => {
       },
     },
   ])('API候補を$caseNameの登録処理へ渡す', async ({ details }) => {
-    const candidate = createApiCandidate()
+    const candidate = createCandidate()
     const dependencies = createDependencies()
 
     await expect(
@@ -178,7 +167,6 @@ describe('解析済みページの保存フロー', () => {
         {
           status: 'success',
           pageUrl: validDetails.sourcePageUrl,
-          acquisitionMethod: 'api',
           candidates: [candidate],
         },
         details,
@@ -203,7 +191,6 @@ describe('解析済みページの保存フロー', () => {
       {
         status: 'success',
         pageUrl: validDetails.sourcePageUrl,
-        acquisitionMethod: 'direct',
         candidates: [createCandidate()],
       },
       validDetails,

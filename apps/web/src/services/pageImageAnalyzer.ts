@@ -11,10 +11,9 @@ export type PageImageAnalysisState =
   | {
       status: 'success'
       pageUrl: string
-      acquisitionMethod: 'direct' | 'api'
       candidates: ImageCandidate[]
     }
-  | { status: 'empty'; pageUrl: string; acquisitionMethod: 'direct' | 'api' }
+  | { status: 'empty'; pageUrl: string }
   | {
       status: 'failure'
       kind: PageImageAnalysisFailureKind
@@ -85,7 +84,6 @@ export async function analyzePageImages(
       const state: PageImageAnalysisState = {
         status: 'empty',
         pageUrl: validation.url,
-        acquisitionMethod: 'api',
       }
       onStateChange(state)
       return state
@@ -95,7 +93,6 @@ export async function analyzePageImages(
     const state: PageImageAnalysisState = {
       status: 'success',
       pageUrl: validation.url,
-      acquisitionMethod: 'api',
       candidates: scoredCandidates,
     }
     onStateChange(state)
