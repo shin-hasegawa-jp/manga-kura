@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import AppNavigation from './components/AppNavigation.vue'
 
 const route = useRoute()
-const isReader = computed(() => route.name === 'reader')
+const isReader = computed(() => route.meta.reader === true)
 </script>
 
 <template>

@@ -23,9 +23,16 @@ export function createAppRouter(
         component: () => import('../views/SeriesDetailView.vue'),
       },
       {
-        path: '/reader/:episodeId',
-        name: 'reader',
+        path: '/series/:seriesId/episodes/:episodeId',
+        name: 'seriesEpisodeReader',
         component: () => import('../views/ReaderView.vue'),
+        meta: { reader: true },
+      },
+      {
+        path: '/episodes/:episodeId',
+        name: 'standaloneEpisodeReader',
+        component: () => import('../views/ReaderView.vue'),
+        meta: { reader: true },
       },
       {
         path: '/storage',
@@ -39,7 +46,7 @@ export function createAppRouter(
       },
       {
         path: '/:pathMatch(.*)*',
-        redirect: { name: 'library' },
+        redirect: '/',
       },
     ],
   })

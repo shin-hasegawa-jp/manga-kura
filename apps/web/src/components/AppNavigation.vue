@@ -20,7 +20,7 @@ const navigationItems: NavItem[] = [
   {
     label: '本棚',
     routeName: 'library',
-    routeGroup: ['library', 'seriesDetail', 'reader'],
+    routeGroup: ['library', 'seriesDetail', 'seriesEpisodeReader', 'standaloneEpisodeReader'],
     icon: mdiBookshelf,
     iconActive: mdiBookshelf,
   },
@@ -43,7 +43,7 @@ const navigationItems: NavItem[] = [
 const route = useRoute()
 
 function isActive(item: NavItem): boolean {
-  return item.routeGroup.includes(route.name as string)
+  return typeof route.name === 'string' && item.routeGroup.includes(route.name)
 }
 </script>
 

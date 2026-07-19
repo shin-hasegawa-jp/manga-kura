@@ -27,13 +27,26 @@ describe('アプリケーションルーター', () => {
     expect(router.currentRoute.value.params).toEqual({ seriesId: 'development-series-1' })
   })
 
-  it('話IDを含むURLを漫画閲覧ルートとして解決する', async () => {
+  it('作品IDと話IDを含むURLを作品配下の漫画閲覧ルートとして解決する', async () => {
     const router = createAppRouter(createMemoryHistory())
 
-    await router.push('/reader/episode-1')
+    await router.push('/series/series-1/episodes/episode-1')
     await router.isReady()
 
-    expect(router.currentRoute.value.name).toBe('reader')
+    expect(router.currentRoute.value.name).toBe('seriesEpisodeReader')
+    expect(router.currentRoute.value.params).toEqual({
+      seriesId: 'series-1',
+      episodeId: 'episode-1',
+    })
+  })
+
+  it('話IDを含むURLを単独話の漫画閲覧ルートとして解決する', async () => {
+    const router = createAppRouter(createMemoryHistory())
+
+    await router.push('/episodes/episode-1')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('standaloneEpisodeReader')
     expect(router.currentRoute.value.params).toEqual({ episodeId: 'episode-1' })
   })
 
@@ -56,4 +69,17 @@ describe('アプリケーションルーター', () => {
     expect(router.currentRoute.value.name).toBe('library')
     expect(router.currentRoute.value.path).toBe('/')
   })
+
+  it.each(['/reader', '/reader/episode-1', '/episodes', '/series/series-1/episodes'])(
+    '廃止または識別子不足のURL %s をライブラリへリダイレクトする',
+    async (path) => {
+      const router = createAppRouter(createMemoryHistory())
+
+      await router.push(path)
+      await router.isReady()
+
+      expect(router.currentRoute.value.name).toBe('library')
+      expect(router.currentRoute.value.path).toBe('/')
+    },
+  )
 })

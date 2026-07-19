@@ -5,6 +5,7 @@ import { mdiBookshelf, mdiPlus } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository, type TopLevelLibraryEntry } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import { getStandaloneEpisodeReaderRoute } from '@/router/readerRoute'
 import AppIcon from '@/components/AppIcon.vue'
 import AppKindBadge from '@/components/AppKindBadge.vue'
 import AppThumbnail from '@/components/AppThumbnail.vue'
@@ -73,7 +74,7 @@ onBeforeUnmount(() => itemPresenter.dispose())
           :to="
             item.kind === 'series'
               ? { name: 'seriesDetail', params: { seriesId: item.itemId } }
-              : { name: 'reader', params: { episodeId: item.itemId } }
+              : getStandaloneEpisodeReaderRoute(item.itemId)
           "
         >
           <div class="library-card__thumb">

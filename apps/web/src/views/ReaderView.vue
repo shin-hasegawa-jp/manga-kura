@@ -6,6 +6,7 @@ import { database } from '@/database/database'
 import { createMangaRepository } from '@/database/repository'
 import type { ComicImage, Episode, Series } from '@/domain/models'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import { getReaderRouteTarget, isReaderRouteTargetValid } from '@/router/readerRoute'
 import AppIcon from '@/components/AppIcon.vue'
 import { createReaderImagePresenter, type ReaderImageItem } from './readerImagePresenter'
 import { getReaderBackRoute, getReaderViewState } from './readerViewState'
@@ -34,12 +35,6 @@ const progress = computed(() =>
     : Math.round((currentImage.value / imageItems.value.length) * 100),
 )
 
-function getRouteEpisodeId(): string {
-  const value = route.params.episodeId
-  if (typeof value === 'string') return value
-  return value?.[0] ?? ''
-}
-
 async function loadReader() {
   isLoading.value = true
   imagePresenter.dispose()
@@ -47,7 +42,18 @@ async function loadReader() {
   currentImage.value = 1
   hasReachedEnd.value = false
 
-  const savedEpisode = await repository.episodes.findById(getRouteEpisodeId())
+  const routeTarget = getReaderRouteTarget(
+    route.name,
+    route.params.seriesId,
+    route.params.episodeId,
+  )
+  const candidateEpisode = routeTarget
+    ? await repository.episodes.findById(routeTarget.episodeId)
+    : undefined
+  const savedEpisode =
+    routeTarget && candidateEpisode && isReaderRouteTargetValid(routeTarget, candidateEpisode)
+      ? candidateEpisode
+      : undefined
   const [savedSeries, savedImages] = await Promise.all([
     savedEpisode?.seriesId ? repository.series.findById(savedEpisode.seriesId) : undefined,
     savedEpisode ? repository.images.findByEpisodeId(savedEpisode.id) : [],
@@ -94,7 +100,7 @@ function updateReadingPosition() {
     window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24
 }
 
-watch(() => route.params.episodeId, loadReader)
+watch(() => route.fullPath, loadReader)
 onMounted(() => {
   void loadReader()
   window.addEventListener('scroll', updateReadingPosition, { passive: true })

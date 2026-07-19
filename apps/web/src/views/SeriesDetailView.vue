@@ -5,6 +5,7 @@ import { mdiAlertCircleOutline, mdiChevronLeft, mdiTextBoxOutline } from '@mdi/j
 import { database } from '@/database/database'
 import { createMangaRepository, type SeriesDetails } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import { getSeriesEpisodeReaderRoute } from '@/router/readerRoute'
 import AppIcon from '@/components/AppIcon.vue'
 import AppThumbnail from '@/components/AppThumbnail.vue'
 import { getSeriesDetailState } from './seriesDetailState'
@@ -100,7 +101,7 @@ onBeforeUnmount(() => itemPresenter.dispose())
         <li v-for="item in episodeItems" :key="item.episodeId">
           <RouterLink
             class="episode-item"
-            :to="{ name: 'reader', params: { episodeId: item.episodeId } }"
+            :to="getSeriesEpisodeReaderRoute(details.series.id, item.episodeId)"
           >
             <div class="episode-item__thumb">
               <AppThumbnail :src="item.thumbnailUrl" :label="item.title" />
