@@ -1,0 +1,44 @@
+name: manga-kura
+
+services:
+  api:
+    build:
+      context: ./apps/api
+      target: development
+    environment:
+      API_CORS_ORIGINS: http://127.0.0.1:17390,http://localhost:17390
+      API_PROXY_TOKEN_SECRET: ${API_PROXY_TOKEN_SECRET:?API_PROXY_TOKEN_SECRET is required}
+    ports:
+      - "17391:8000"
+    volumes:
+      - ./apps/api:/app
+      - api-venv:/app/.venv
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_FETCH_API_BASE_URL: http://127.0.0.1:17391
+    ports:
+      - "17390:5173"
+    volumes:
+      - ./apps/web:/app
+      - web-node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  api-venv:
+  web-node-modules:
