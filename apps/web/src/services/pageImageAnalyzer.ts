@@ -35,8 +35,8 @@ const defaultDependencies: PageImageAnalyzerDependencies = {
   scoreCandidates: scoreAndSelectImageCandidates,
 }
 
-function getFailureMessage(cause: unknown, fallback: string): string {
-  return cause instanceof Error ? cause.message : fallback
+function getFailureMessage(cause: unknown, defaultMessage: string): string {
+  return cause instanceof Error ? cause.message : defaultMessage
 }
 
 async function acquireCandidates(
