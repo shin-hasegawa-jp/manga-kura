@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
+  mdiAlertOutline,
+  mdiCheck,
   mdiChevronLeft,
   mdiFileRemoveOutline,
   mdiImageSearchOutline,
@@ -35,6 +37,10 @@ const saveFlowError = ref('')
 let fetchAnalyzedImages = createSelectedImageBlobFetcher()
 // 進行中の解析を識別し、キャンセル・URL編集で古い解析結果を無視する
 let analysisToken = 0
+// 画像確認（ステップ2）と情報入力（ステップ3）の切り替え
+const saveStage = ref<'image' | 'info'>('image')
+// プレビュー画像の読み込みに失敗した候補ID（保存時の取得失敗=fetchStatus 'failed' とは区別する）
+const previewErrorIds = ref<ReadonlySet<string>>(new Set())
 const imageCandidateListState = computed(() =>
   getImageCandidateListState(pageImageAnalysisState.value),
 )
@@ -71,8 +77,44 @@ const fetchFailureMessage = computed(() => {
   const state = pageImageAnalysisState.value
   return state?.status === 'failure' && state.kind !== 'invalid-url' ? state.message : ''
 })
-// ステップ2以降（画像確認・情報入力・完了）は解析成功時のみ表示する
-const currentStep = computed(() => (imageCandidateListState.value.kind === 'populated' ? 2 : 1))
+// ステップは解析成功時のみ2以降へ進む。画像確認=2、情報入力=3。
+const currentStep = computed(() => {
+  if (imageCandidateListState.value.kind !== 'populated') {
+    return 1
+  }
+  return saveStage.value === 'info' ? 3 : 2
+})
+
+function candidateFailureKind(candidate: ImageCandidate): 'save' | 'preview' | undefined {
+  if (candidate.fetchStatus === 'failed') {
+    return 'save'
+  }
+  if (previewErrorIds.value.has(candidate.id)) {
+    return 'preview'
+  }
+  return undefined
+}
+
+function onPreviewError(candidateId: string) {
+  const next = new Set(previewErrorIds.value)
+  next.add(candidateId)
+  previewErrorIds.value = next
+}
+
+function proceedToInfo() {
+  if (imageCandidateSelectionState.value.canSave) {
+    saveStage.value = 'info'
+  }
+}
+
+// ヘッダーの戻る：情報入力→画像確認、画像確認→URL入力
+function goBack() {
+  if (currentStep.value === 3) {
+    saveStage.value = 'image'
+    return
+  }
+  returnToUrlInput()
+}
 
 const {
   newSeriesTitle,
@@ -114,6 +156,8 @@ async function analyzePageUrl() {
   const token = ++analysisToken
   fetchAnalyzedImages = createSelectedImageBlobFetcher()
   saveFlowError.value = ''
+  saveStage.value = 'image'
+  previewErrorIds.value = new Set()
   const result = await analyzePageImages(pageUrl.value, undefined, (state) => {
     if (token === analysisToken) {
       pageImageAnalysisState.value = state
@@ -137,6 +181,8 @@ function returnToUrlInput() {
   analysisToken += 1
   pageImageAnalysisState.value = undefined
   saveFlowError.value = ''
+  saveStage.value = 'image'
+  previewErrorIds.value = new Set()
 }
 
 function getCandidatePreviewUrl(candidate: ImageCandidate): string {
@@ -212,6 +258,8 @@ async function saveCurrentRegistration() {
     pageUrl.value = ''
     pageImageAnalysisState.value = undefined
     fetchAnalyzedImages = createSelectedImageBlobFetcher()
+    saveStage.value = 'image'
+    previewErrorIds.value = new Set()
     resetNewSeriesFields()
     resetStandaloneEpisodeFields()
     resetExistingSeriesEpisodeFields()
@@ -269,8 +317,8 @@ function selectRegistrationMode(mode: RegistrationMode) {
         v-if="currentStep > 1"
         class="app-icon-btn save-header__back"
         type="button"
-        aria-label="URL入力へ戻る"
-        @click="returnToUrlInput"
+        :aria-label="currentStep === 3 ? '画像確認へ戻る' : 'URL入力へ戻る'"
+        @click="goBack"
       >
         <AppIcon :path="mdiChevronLeft" :size="28" />
       </button>
@@ -387,214 +435,254 @@ function selectRegistrationMode(mode: RegistrationMode) {
       </div>
     </section>
 
-    <!-- ステップ2以降：画像確認・情報入力（詳細はレビュー単位25・26で反映） -->
     <template v-else-if="imageCandidateListState.kind === 'populated'">
-      <section class="image-candidates" aria-labelledby="image-candidates-heading">
-        <div class="image-candidates__heading">
-          <h2 id="image-candidates-heading">画像候補</h2>
-          <span>
-            {{ imageCandidateSelectionState.selectedCount }} /
-            {{ imageCandidateSelectionState.totalCount }}件を選択
-          </span>
+      <!-- ステップ2：画像確認 -->
+      <section
+        v-if="saveStage === 'image'"
+        class="image-step"
+        aria-labelledby="image-candidates-heading"
+      >
+        <div class="image-step__heading">
+          <h2 id="image-candidates-heading" class="image-step__count">
+            <strong>{{ imageCandidateSelectionState.selectedCount }}枚</strong>を選択中
+            <span class="image-step__total">/ {{ imageCandidateSelectionState.totalCount }}枚</span>
+          </h2>
+          <div class="image-step__bulk" aria-label="画像候補の一括選択">
+            <button
+              class="app-btn app-btn--text"
+              type="button"
+              :disabled="
+                imageCandidateSelectionState.selectedCount ===
+                imageCandidateSelectionState.totalCount
+              "
+              @click="selectAllCandidates"
+            >
+              全選択
+            </button>
+            <button
+              class="app-btn app-btn--text"
+              type="button"
+              :disabled="imageCandidateSelectionState.selectedCount === 0"
+              @click="clearAllCandidateSelections"
+            >
+              全解除
+            </button>
+          </div>
         </div>
-        <div class="image-candidates__selection-actions" aria-label="画像候補の一括選択">
-          <button
-            class="app-btn app-btn--text"
-            type="button"
-            :disabled="
-              imageCandidateSelectionState.selectedCount === imageCandidateSelectionState.totalCount
-            "
-            @click="selectAllCandidates"
-          >
-            すべて選択
-          </button>
-          <button
-            class="app-btn app-btn--text"
-            type="button"
-            :disabled="imageCandidateSelectionState.selectedCount === 0"
-            @click="clearAllCandidateSelections"
-          >
-            すべて解除
-          </button>
-        </div>
-        <ul class="image-candidate-list">
-          <li
-            v-for="candidate in imageCandidateListState.candidates"
-            :key="candidate.id"
-            class="image-candidate"
-            :class="{ 'image-candidate--failed': candidate.fetchStatus === 'failed' }"
-          >
-            <img
-              v-if="candidate.fetchStatus !== 'failed'"
-              class="image-candidate__preview"
-              :src="getCandidatePreviewUrl(candidate)"
-              :alt="`画像候補 ${candidate.domOrder + 1}`"
-            />
-            <div v-else class="image-candidate__preview image-candidate__preview--failed">
-              読込失敗
-            </div>
-            <div class="image-candidate__details">
-              <label class="image-candidate__selection">
-                <input
-                  type="checkbox"
-                  :checked="candidate.isSelected"
-                  @change="toggleCandidate(candidate.id)"
+
+        <ul class="candidate-grid">
+          <li v-for="candidate in imageCandidateListState.candidates" :key="candidate.id">
+            <label
+              class="candidate-card"
+              :class="{
+                'candidate-card--selected':
+                  candidate.isSelected && candidateFailureKind(candidate) === undefined,
+                'candidate-card--preview-failed': candidateFailureKind(candidate) === 'preview',
+                'candidate-card--save-failed': candidateFailureKind(candidate) === 'save',
+              }"
+            >
+              <input
+                class="visually-hidden"
+                type="checkbox"
+                :checked="candidate.isSelected"
+                @change="toggleCandidate(candidate.id)"
+              />
+              <span class="candidate-card__media">
+                <img
+                  v-if="candidateFailureKind(candidate) === undefined"
+                  class="candidate-card__image"
+                  :src="getCandidatePreviewUrl(candidate)"
+                  :alt="`画像候補 ${candidate.domOrder + 1}`"
+                  @error="onPreviewError(candidate.id)"
                 />
-                <strong>候補 {{ candidate.domOrder + 1 }}</strong>
-              </label>
-              <span v-if="candidate.width !== undefined && candidate.height !== undefined">
-                {{ candidate.width }} × {{ candidate.height }} px
+                <span v-else class="candidate-card__failure">
+                  <AppIcon :path="mdiAlertOutline" :size="24" />
+                  {{ candidateFailureKind(candidate) === 'save' ? '保存に失敗' : '読み込み失敗' }}
+                </span>
               </span>
-              <span v-else>サイズ取得不可</span>
-              <span>{{ candidate.isSelected ? '選択済み' : '未選択' }}</span>
-            </div>
+              <span class="candidate-card__check" aria-hidden="true">
+                <AppIcon v-if="candidate.isSelected" :path="mdiCheck" :size="16" />
+              </span>
+              <span class="candidate-card__number">{{ candidate.domOrder + 1 }}</span>
+              <span class="candidate-card__size">
+                {{
+                  candidate.width !== undefined && candidate.height !== undefined
+                    ? `${candidate.width} × ${candidate.height}`
+                    : 'サイズ不明'
+                }}
+              </span>
+              <span class="visually-hidden">
+                {{ candidate.isSelected ? '選択済み' : '未選択' }}
+              </span>
+            </label>
           </li>
         </ul>
+
+        <button
+          class="app-btn app-btn--primary app-btn--block image-step__next"
+          type="button"
+          :disabled="!imageCandidateSelectionState.canSave"
+          @click="proceedToInfo"
+        >
+          {{ imageCandidateSelectionState.selectedCount }}枚で次へ
+        </button>
       </section>
 
-      <p class="save-view__description">保存する話の登録方法を選択してください。</p>
+      <!-- ステップ3：情報入力（詳細はレビュー単位26で反映） -->
+      <template v-else>
+        <p class="save-view__description">保存する話の登録方法を選択してください。</p>
 
-      <div class="registration-mode" aria-label="登録方法">
-        <button
-          v-for="option in registrationModeOptions"
-          :key="option.value"
-          class="app-choice"
-          :class="{ 'app-choice--selected': registrationMode === option.value }"
-          type="button"
-          :disabled="isSavingAnalyzedPage"
-          :aria-pressed="registrationMode === option.value"
-          @click="selectRegistrationMode(option.value)"
-        >
-          {{ option.label }}
-        </button>
-      </div>
+        <div class="registration-mode" aria-label="登録方法">
+          <button
+            v-for="option in registrationModeOptions"
+            :key="option.value"
+            class="app-choice"
+            :class="{ 'app-choice--selected': registrationMode === option.value }"
+            type="button"
+            :disabled="isSavingAnalyzedPage"
+            :aria-pressed="registrationMode === option.value"
+            @click="selectRegistrationMode(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
 
-      <form
-        v-if="registrationMode === 'newSeries'"
-        class="registration-fields"
-        aria-label="新規作品の入力項目"
-        @submit.prevent="saveCurrentRegistration"
-      >
-        <label class="app-field-label">
-          <span>作品名</span>
-          <input v-model="newSeriesTitle" class="app-field" name="seriesTitle" type="text" />
-        </label>
-        <label class="app-field-label">
-          <span>話タイトル</span>
-          <input v-model="newSeriesEpisodeTitle" class="app-field" name="title" type="text" />
-        </label>
-        <label class="app-field-label">
-          <span>元ページURL</span>
-          <input
-            v-model="newSeriesSourcePageUrl"
-            class="app-field"
-            name="sourcePageUrl"
-            type="url"
-          />
-        </label>
-        <button
-          class="app-btn app-btn--primary app-btn--block"
-          :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
-          type="submit"
+        <form
+          v-if="registrationMode === 'newSeries'"
+          class="registration-fields"
+          aria-label="新規作品の入力項目"
+          @submit.prevent="saveCurrentRegistration"
         >
-          {{ isSavingAnalyzedPage || isSubmittingNewSeries ? '保存中…' : '新規作品を登録' }}
-        </button>
-        <p
-          v-if="newSeriesSubmission"
-          class="app-message"
-          :class="`app-message--${newSeriesSubmission.status}`"
-          role="status"
+          <label class="app-field-label">
+            <span>作品名</span>
+            <input v-model="newSeriesTitle" class="app-field" name="seriesTitle" type="text" />
+          </label>
+          <label class="app-field-label">
+            <span>話タイトル</span>
+            <input v-model="newSeriesEpisodeTitle" class="app-field" name="title" type="text" />
+          </label>
+          <label class="app-field-label">
+            <span>元ページURL</span>
+            <input
+              v-model="newSeriesSourcePageUrl"
+              class="app-field"
+              name="sourcePageUrl"
+              type="url"
+            />
+          </label>
+          <button
+            class="app-btn app-btn--primary app-btn--block"
+            :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
+            type="submit"
+          >
+            {{ isSavingAnalyzedPage || isSubmittingNewSeries ? '保存中…' : '新規作品を登録' }}
+          </button>
+          <p
+            v-if="newSeriesSubmission"
+            class="app-message"
+            :class="`app-message--${newSeriesSubmission.status}`"
+            role="status"
+          >
+            {{ newSeriesSubmission.message }}
+          </p>
+        </form>
+
+        <form
+          v-else-if="registrationMode === 'standaloneEpisode'"
+          class="registration-fields"
+          aria-label="単独の話の入力項目"
+          @submit.prevent="saveCurrentRegistration"
         >
-          {{ newSeriesSubmission.message }}
+          <label class="app-field-label">
+            <span>話タイトル</span>
+            <input v-model="standaloneEpisodeTitle" class="app-field" name="title" type="text" />
+          </label>
+          <label class="app-field-label">
+            <span>元ページURL</span>
+            <input
+              v-model="standaloneEpisodeSourcePageUrl"
+              class="app-field"
+              name="sourcePageUrl"
+              type="url"
+            />
+          </label>
+          <button
+            class="app-btn app-btn--primary app-btn--block"
+            :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
+            type="submit"
+          >
+            {{
+              isSavingAnalyzedPage || isSubmittingStandaloneEpisode ? '保存中…' : '単独の話を登録'
+            }}
+          </button>
+          <p
+            v-if="standaloneEpisodeSubmission"
+            class="app-message"
+            :class="`app-message--${standaloneEpisodeSubmission.status}`"
+            role="status"
+          >
+            {{ standaloneEpisodeSubmission.message }}
+          </p>
+        </form>
+
+        <form
+          v-else
+          class="registration-fields"
+          aria-label="既存作品への話追加の入力項目"
+          @submit.prevent="saveCurrentRegistration"
+        >
+          <label class="app-field-label">
+            <span>追加先作品</span>
+            <select v-model="existingSeriesId" class="app-field" name="seriesId">
+              <option value="">作品を選択してください</option>
+              <option v-for="series in seriesOptions" :key="series.id" :value="series.id">
+                {{ series.title }}
+              </option>
+            </select>
+          </label>
+          <label class="app-field-label">
+            <span>話タイトル</span>
+            <input
+              v-model="existingSeriesEpisodeTitle"
+              class="app-field"
+              name="title"
+              type="text"
+            />
+          </label>
+          <label class="app-field-label">
+            <span>元ページURL</span>
+            <input
+              v-model="existingSeriesEpisodeSourcePageUrl"
+              class="app-field"
+              name="sourcePageUrl"
+              type="url"
+            />
+          </label>
+          <button
+            class="app-btn app-btn--primary app-btn--block"
+            :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
+            type="submit"
+          >
+            {{
+              isSavingAnalyzedPage || isSubmittingExistingSeriesEpisode
+                ? '保存中…'
+                : '作品へ話を追加'
+            }}
+          </button>
+          <p
+            v-if="existingSeriesEpisodeSubmission"
+            class="app-message"
+            :class="`app-message--${existingSeriesEpisodeSubmission.status}`"
+            role="status"
+          >
+            {{ existingSeriesEpisodeSubmission.message }}
+          </p>
+        </form>
+
+        <p v-if="saveFlowError" class="app-message app-message--error" role="alert">
+          {{ saveFlowError }}
         </p>
-      </form>
-
-      <form
-        v-else-if="registrationMode === 'standaloneEpisode'"
-        class="registration-fields"
-        aria-label="単独の話の入力項目"
-        @submit.prevent="saveCurrentRegistration"
-      >
-        <label class="app-field-label">
-          <span>話タイトル</span>
-          <input v-model="standaloneEpisodeTitle" class="app-field" name="title" type="text" />
-        </label>
-        <label class="app-field-label">
-          <span>元ページURL</span>
-          <input
-            v-model="standaloneEpisodeSourcePageUrl"
-            class="app-field"
-            name="sourcePageUrl"
-            type="url"
-          />
-        </label>
-        <button
-          class="app-btn app-btn--primary app-btn--block"
-          :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
-          type="submit"
-        >
-          {{ isSavingAnalyzedPage || isSubmittingStandaloneEpisode ? '保存中…' : '単独の話を登録' }}
-        </button>
-        <p
-          v-if="standaloneEpisodeSubmission"
-          class="app-message"
-          :class="`app-message--${standaloneEpisodeSubmission.status}`"
-          role="status"
-        >
-          {{ standaloneEpisodeSubmission.message }}
-        </p>
-      </form>
-
-      <form
-        v-else
-        class="registration-fields"
-        aria-label="既存作品への話追加の入力項目"
-        @submit.prevent="saveCurrentRegistration"
-      >
-        <label class="app-field-label">
-          <span>追加先作品</span>
-          <select v-model="existingSeriesId" class="app-field" name="seriesId">
-            <option value="">作品を選択してください</option>
-            <option v-for="series in seriesOptions" :key="series.id" :value="series.id">
-              {{ series.title }}
-            </option>
-          </select>
-        </label>
-        <label class="app-field-label">
-          <span>話タイトル</span>
-          <input v-model="existingSeriesEpisodeTitle" class="app-field" name="title" type="text" />
-        </label>
-        <label class="app-field-label">
-          <span>元ページURL</span>
-          <input
-            v-model="existingSeriesEpisodeSourcePageUrl"
-            class="app-field"
-            name="sourcePageUrl"
-            type="url"
-          />
-        </label>
-        <button
-          class="app-btn app-btn--primary app-btn--block"
-          :disabled="isSavingAnalyzedPage || !imageCandidateSelectionState.canSave"
-          type="submit"
-        >
-          {{
-            isSavingAnalyzedPage || isSubmittingExistingSeriesEpisode ? '保存中…' : '作品へ話を追加'
-          }}
-        </button>
-        <p
-          v-if="existingSeriesEpisodeSubmission"
-          class="app-message"
-          :class="`app-message--${existingSeriesEpisodeSubmission.status}`"
-          role="status"
-        >
-          {{ existingSeriesEpisodeSubmission.message }}
-        </p>
-      </form>
-
-      <p v-if="saveFlowError" class="app-message app-message--error" role="alert">
-        {{ saveFlowError }}
-      </p>
+      </template>
     </template>
   </main>
 </template>
@@ -738,80 +826,157 @@ h2 {
   gap: var(--app-space-2xs);
 }
 
-.image-candidates {
+/* ---- ステップ2：画像確認 ---- */
+.image-step {
   display: grid;
-  gap: var(--app-space-xs);
-  padding: var(--app-space-sm);
-  border: 1px solid var(--app-color-border);
-  border-radius: var(--app-radius-md);
+  gap: var(--app-space-sm);
 }
 
-.image-candidates__heading {
+.image-step__heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: var(--app-space-2xs);
 }
 
-.image-candidates__selection-actions {
+.image-step__count {
+  margin: 0;
+  font-size: var(--app-font-size-md);
+  font-weight: var(--app-font-weight-medium);
+}
+
+.image-step__count strong {
+  font-size: var(--app-font-size-lg);
+}
+
+.image-step__total {
+  color: var(--app-color-text-muted);
+}
+
+.image-step__bulk {
   display: flex;
   gap: var(--app-space-2xs);
 }
 
-.image-candidate-list {
+.candidate-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-  gap: var(--app-space-xs);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--app-space-2xs);
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
-.image-candidate {
-  display: grid;
-  gap: var(--app-space-2xs);
-  min-width: 0;
-  padding: var(--app-space-2xs);
-  background: var(--app-color-surface);
+.candidate-card {
+  position: relative;
+  display: block;
+  overflow: hidden;
   border: 0.125rem solid transparent;
   border-radius: var(--app-radius-md);
-  box-shadow: 0 0 0 1px var(--app-color-border);
+  cursor: pointer;
 }
 
-.image-candidate--failed {
+.candidate-card:focus-within {
+  outline: 0.1875rem solid var(--app-color-primary);
+  outline-offset: 0.125rem;
+}
+
+.candidate-card--selected {
+  border-color: var(--app-color-primary);
+}
+
+.candidate-card--save-failed {
   border-color: var(--app-color-error);
 }
 
-.image-candidate__preview {
-  width: 100%;
-  height: 12rem;
-  object-fit: contain;
-  background: rgba(var(--v-theme-on-surface), 5%);
-  border-radius: var(--app-radius-sm);
+.candidate-card__media {
+  display: block;
+  aspect-ratio: 3 / 4;
+  background: var(--app-color-panel);
 }
 
-.image-candidate__preview--failed {
+.candidate-card__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.candidate-card__failure {
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: var(--app-space-3xs);
+  width: 100%;
+  height: 100%;
+  padding: var(--app-space-2xs);
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-xs);
+  text-align: center;
+}
+
+.candidate-card--save-failed .candidate-card__failure {
   color: var(--app-color-error);
   font-weight: var(--app-font-weight-bold);
 }
 
-.image-candidate__details {
+/* 選択チェック（右上） */
+.candidate-card__check {
+  position: absolute;
+  top: var(--app-space-3xs);
+  right: var(--app-space-3xs);
   display: grid;
-  gap: 0.125rem;
-  font-size: var(--app-font-size-sm);
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--app-color-on-primary);
+  background: var(--app-color-surface);
+  border: 0.125rem solid var(--app-color-surface);
+  border-radius: var(--app-radius-pill);
 }
 
-.image-candidate__selection {
-  display: flex;
-  gap: var(--app-space-3xs);
-  align-items: center;
-  cursor: pointer;
+.candidate-card--selected .candidate-card__check {
+  background: var(--app-color-primary);
+  border-color: var(--app-color-primary);
 }
 
-.image-candidate__selection input {
-  width: 1.25rem;
-  height: 1.25rem;
-  margin: 0;
+/* DOM順の番号（左下） */
+.candidate-card__number {
+  position: absolute;
+  bottom: var(--app-space-3xs);
+  left: var(--app-space-3xs);
+  min-width: 1.25rem;
+  padding: 0 0.3125rem;
+  color: var(--app-color-on-cta);
+  font-size: var(--app-font-size-xs);
+  font-weight: var(--app-font-weight-bold);
+  text-align: center;
+  background: rgba(0, 0, 0, 55%);
+  border-radius: var(--app-radius-sm);
+}
+
+/* 幅・高さ（右下） */
+.candidate-card__size {
+  position: absolute;
+  right: var(--app-space-3xs);
+  bottom: var(--app-space-3xs);
+  padding: 0 0.3125rem;
+  color: var(--app-color-on-cta);
+  font-size: 0.6875rem;
+  background: rgba(0, 0, 0, 55%);
+  border-radius: var(--app-radius-sm);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>
