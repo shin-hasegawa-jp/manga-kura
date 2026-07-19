@@ -7,6 +7,21 @@ import {
 } from '../imageSourceExtractor'
 
 describe('img要素のsrc抽出', () => {
+  it('input type=imageのsrcもDOM順の画像候補として抽出する', () => {
+    const html = `
+      <input type="image" src="/images/page-01.jpg">
+      <img src="/images/page-02.jpg">
+      <input type="IMAGE" src="/images/page-03.jpg">
+      <input type="text" src="/images/not-image.jpg">
+    `
+
+    expect(extractImageSources(html)).toEqual([
+      '/images/page-01.jpg',
+      '/images/page-02.jpg',
+      '/images/page-03.jpg',
+    ])
+  })
+
   it('画像URLをDOM上の出現順で抽出する', () => {
     const html = `
       <!doctype html>

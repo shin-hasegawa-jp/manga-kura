@@ -42,18 +42,18 @@ async def test_client_limit_is_independent_per_key_and_recovers() -> None:
 
 
 @pytest.mark.asyncio
-async def test_domain_interval_rejects_rapid_repeat_and_recovers() -> None:
+async def test_domain_interval_waits_before_rapid_repeat() -> None:
     clock = ClockStub()
-    limiter = DomainAccessLimiter(1, clock)
+    waits: list[float] = []
+
+    async def sleep(seconds: float) -> None:
+        waits.append(seconds)
+        clock.advance(seconds)
+
+    limiter = DomainAccessLimiter(1, clock, sleep)
 
     await limiter.require("example.com")
-
-    with pytest.raises(ApiError) as error:
-        await limiter.require("example.com")
-
-    assert error.value.code is ApiErrorCode.RATE_LIMITED
-    assert error.value.details == {"retryAfterSeconds": 1, "scope": "domain"}
-
+    await limiter.require("example.com")
     await limiter.require("cdn.example.com")
-    clock.advance(1)
-    await limiter.require("example.com")
+
+    assert waits == [1]

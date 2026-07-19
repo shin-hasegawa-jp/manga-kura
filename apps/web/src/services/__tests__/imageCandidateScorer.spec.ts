@@ -60,6 +60,24 @@ describe('画像候補のデフォルト選択スコア', () => {
     expect(scored[1]?.selectionReasons).not.toContain('continuous-dom-order')
   })
 
+  it('一部の欠番や末尾の外れ値があっても連番候補として扱う', () => {
+    const candidates = [1, 2, 3, 5, 15].map((number, domOrder) =>
+      createCandidate(
+        `page-${number}`,
+        domOrder,
+        `https://example.com/comic/${number}.jpg`,
+        800,
+        1200,
+      ),
+    )
+
+    const scored = scoreAndSelectImageCandidates(candidates)
+
+    expect(
+      scored.every(({ selectionReasons }) => selectionReasons.includes('sequential-filename')),
+    ).toBe(true)
+  })
+
   it('共通URLパスを持つ候補へ加点する', () => {
     const candidates = [
       createCandidate('cover', 0, 'https://example.com/comic/cover.jpg', 700, 1000),

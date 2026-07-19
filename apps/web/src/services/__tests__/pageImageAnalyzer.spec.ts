@@ -167,6 +167,7 @@ describe('ページ画像解析フロー', () => {
       imageUrl: 'https://cdn.example.com/page01.jpg',
       sourceAttribute: 'src',
       proxyToken: 'signed-token',
+      previewToken: 'preview-token',
     }
     const dependencies = createDependencies({
       fetchHtml: vi.fn(async () => {
@@ -200,10 +201,12 @@ describe('ページ画像解析フロー', () => {
           id: 'image-candidate-0',
           acquisitionMethod: 'api',
           proxyToken: 'signed-token',
+          previewToken: 'preview-token',
         }),
       ],
     })
-    expect(calls).toEqual(['direct', 'api', 'convert', 'dimensions', 'score'])
+    expect(calls).toEqual(['direct', 'api', 'convert', 'score'])
+    expect(dependencies.loadDimensions).not.toHaveBeenCalled()
     expect(dependencies.fetchHtml).toHaveBeenCalledOnce()
     expect(dependencies.analyzeViaApi).toHaveBeenCalledOnce()
     expect(dependencies.createCandidates).not.toHaveBeenCalled()

@@ -122,7 +122,10 @@ export async function analyzePageImages(
       return state
     }
 
-    const candidatesWithDimensions = await dependencies.loadDimensions(acquisition.candidates)
+    const candidatesWithDimensions =
+      acquisition.acquisitionMethod === 'api'
+        ? acquisition.candidates
+        : await dependencies.loadDimensions(acquisition.candidates)
     const scoredCandidates = dependencies.scoreCandidates(candidatesWithDimensions)
     const state: PageImageAnalysisState = {
       status: 'success',

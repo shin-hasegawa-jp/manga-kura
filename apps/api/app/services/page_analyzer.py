@@ -17,6 +17,7 @@ from app.services.proxy_token import ProxyTokenIssuer
 class AnalyzedImageCandidate:
     candidate: ImageCandidate
     proxy_token: str
+    preview_token: str
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class PageAnalyzer:
             raise ApiError(ApiErrorCode.TOO_MANY_CANDIDATES)
 
         batch_id = self._batch_id_factory()
+        preview_batch_id = self._batch_id_factory()
         return PageAnalysis(
             page_url=fetched_html.url,
             candidates=tuple(
@@ -56,6 +58,11 @@ class PageAnalyzer:
                     proxy_token=self._token_issuer.issue(
                         candidate.image_url,
                         batch_id,
+                        candidate.id,
+                    ),
+                    preview_token=self._token_issuer.issue(
+                        candidate.image_url,
+                        preview_batch_id,
                         candidate.id,
                     ),
                 )

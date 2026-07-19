@@ -75,9 +75,8 @@ function getSequentialKeys(contexts: readonly CandidateContext[]): Set<string> {
   for (const [key, numbers] of numbersByKey) {
     const sortedNumbers = [...numbers].sort((left, right) => left - right)
     if (
-      sortedNumbers.length >= 2 &&
-      sortedNumbers.every(
-        (number, index) => index === 0 || number === (sortedNumbers[index - 1] ?? number) + 1,
+      sortedNumbers.some(
+        (number, index) => index > 0 && number === (sortedNumbers[index - 1] ?? number) + 1,
       )
     ) {
       sequentialKeys.add(key)

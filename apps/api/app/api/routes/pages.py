@@ -43,6 +43,7 @@ async def analyze_page(
                 image_url=parse_http_url(result.candidate.image_url),
                 source_attribute=result.candidate.source_attribute,
                 proxy_token=result.proxy_token,
+                preview_token=result.preview_token,
             )
             for result in analysis.candidates
         ],

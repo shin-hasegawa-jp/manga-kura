@@ -32,7 +32,10 @@ interface ImageCandidateBase {
 }
 
 export type ImageCandidate = ImageCandidateBase &
-  ({ acquisitionMethod: 'direct' } | { acquisitionMethod: 'api'; proxyToken: string })
+  (
+    | { acquisitionMethod: 'direct' }
+    | { acquisitionMethod: 'api'; proxyToken: string; previewToken: string }
+  )
 
 export function createImageCandidates(
   html: string,

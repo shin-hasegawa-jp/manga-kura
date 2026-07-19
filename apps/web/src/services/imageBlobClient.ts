@@ -59,6 +59,7 @@ export type ImageBlobBatchFetchResult =
 export interface ImageBlobClientDependencies {
   fetch: typeof fetch
   fetchProxiedImage?(proxyToken: string): Promise<ProxiedImage>
+  loadBlobDimensions?(blob: Blob): Promise<{ width: number; height: number }>
 }
 
 const defaultDependencies: ImageBlobClientDependencies = {
@@ -68,6 +69,33 @@ const defaultDependencies: ImageBlobClientDependencies = {
 function getImageMediaType(contentType: string): string | undefined {
   const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase()
   return mediaType?.startsWith('image/') ? mediaType : undefined
+}
+
+function loadBrowserBlobDimensions(blob: Blob): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(blob)
+    const image = new Image()
+
+    image.onload = () => {
+      const dimensions = { width: image.naturalWidth, height: image.naturalHeight }
+      URL.revokeObjectURL(objectUrl)
+      resolve(dimensions)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('画像の幅と高さを取得できませんでした。'))
+    }
+    image.src = objectUrl
+  })
+}
+
+function hasValidDimensions(dimensions: { width: number; height: number }): boolean {
+  return (
+    Number.isFinite(dimensions.width) &&
+    dimensions.width > 0 &&
+    Number.isFinite(dimensions.height) &&
+    dimensions.height > 0
+  )
 }
 
 function toApiImageFetchError(
@@ -91,7 +119,6 @@ function toApiImageFetchError(
 
 async function fetchApiImageBlob(
   candidate: Extract<ImageCandidate, { acquisitionMethod: 'api' }>,
-  dimensions: { width: number; height: number },
   dependencies: ImageBlobClientDependencies,
 ): Promise<FetchedImageBlob> {
   let image: ProxiedImage
@@ -105,6 +132,28 @@ async function fetchApiImageBlob(
       candidateId: candidate.id,
       imageUrl: candidate.imageUrl,
     })
+  }
+
+  let dimensions: { width: number; height: number }
+  if (candidate.width !== undefined && candidate.height !== undefined) {
+    dimensions = { width: candidate.width, height: candidate.height }
+  } else {
+    try {
+      dimensions = await (dependencies.loadBlobDimensions ?? loadBrowserBlobDimensions)(image.blob)
+    } catch {
+      throw new ImageBlobFetchError(
+        'missingDimensions',
+        '中継画像の幅と高さを取得できませんでした。',
+        { candidateId: candidate.id, imageUrl: candidate.imageUrl },
+      )
+    }
+    if (!hasValidDimensions(dimensions)) {
+      throw new ImageBlobFetchError(
+        'missingDimensions',
+        '中継画像の幅と高さを取得できませんでした。',
+        { candidateId: candidate.id, imageUrl: candidate.imageUrl },
+      )
+    }
   }
 
   return {
@@ -123,19 +172,15 @@ export async function fetchImageBlob(
   candidate: ImageCandidate,
   dependencies: ImageBlobClientDependencies = defaultDependencies,
 ): Promise<FetchedImageBlob> {
+  if (candidate.acquisitionMethod === 'api') {
+    return fetchApiImageBlob(candidate, dependencies)
+  }
+
   if (candidate.width === undefined || candidate.height === undefined) {
     throw new ImageBlobFetchError('missingDimensions', '画像の幅と高さを取得できませんでした。', {
       candidateId: candidate.id,
       imageUrl: candidate.imageUrl,
     })
-  }
-
-  if (candidate.acquisitionMethod === 'api') {
-    return fetchApiImageBlob(
-      candidate,
-      { width: candidate.width, height: candidate.height },
-      dependencies,
-    )
   }
 
   let response: Response
@@ -202,26 +247,25 @@ export async function fetchSelectedImageBlobs(
   dependencies: ImageBlobClientDependencies = defaultDependencies,
 ): Promise<ImageBlobBatchFetchResult> {
   const selectedCandidates = candidates.filter(({ isSelected }) => isSelected)
-  const results = await Promise.all(
-    selectedCandidates.map(async (candidate) => {
-      try {
-        return { image: await fetchImageBlob(candidate, dependencies) }
-      } catch (error) {
-        if (error instanceof ImageBlobFetchError) {
-          return { error }
-        }
-        return {
-          error: new ImageBlobFetchError('network', '画像の取得中にエラーが発生しました。', {
-            candidateId: candidate.id,
-            imageUrl: candidate.imageUrl,
-          }),
-        }
-      }
-    }),
-  )
+  const results: ({ image: FetchedImageBlob } | { error: ImageBlobFetchError })[] = []
+  for (const candidate of selectedCandidates) {
+    try {
+      results.push({ image: await fetchImageBlob(candidate, dependencies) })
+    } catch (error) {
+      results.push({
+        error:
+          error instanceof ImageBlobFetchError
+            ? error
+            : new ImageBlobFetchError('network', '画像の取得中にエラーが発生しました。', {
+                candidateId: candidate.id,
+                imageUrl: candidate.imageUrl,
+              }),
+      })
+    }
+  }
 
-  const images = results.flatMap((result) => (result.image === undefined ? [] : [result.image]))
-  const failures = results.flatMap((result) => (result.error === undefined ? [] : [result.error]))
+  const images = results.flatMap((result) => ('image' in result ? [result.image] : []))
+  const failures = results.flatMap((result) => ('error' in result ? [result.error] : []))
 
   if (failures.length === 0) {
     return { status: 'success', images, failures: [] }

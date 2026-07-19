@@ -17,6 +17,7 @@ const apiImageCandidateSchema = v.object({
   imageUrl: v.pipe(v.string(), v.url()),
   sourceAttribute: imageSourceAttributeSchema,
   proxyToken: v.pipe(v.string(), v.nonEmpty()),
+  previewToken: v.pipe(v.string(), v.nonEmpty()),
 })
 
 export const pageAnalysisResponseSchema = v.object({

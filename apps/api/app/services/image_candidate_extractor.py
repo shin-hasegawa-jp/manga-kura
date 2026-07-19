@@ -106,11 +106,17 @@ def _find_image_source(image: Tag) -> _ExtractedSource | None:
     return None
 
 
+def _is_image_element(tag: Tag) -> bool:
+    if tag.name == "img":
+        return True
+    return tag.name == "input" and _get_string_attribute(tag, "type").lower() == "image"
+
+
 def _extract_unique_sources(soup: BeautifulSoup) -> tuple[_ExtractedSource, ...]:
     candidates: list[_ExtractedSource] = []
     seen_sources: set[str] = set()
-    for image in soup.find_all("img"):
-        if not isinstance(image, Tag):
+    for image in soup.find_all(("img", "input")):
+        if not isinstance(image, Tag) or not _is_image_element(image):
             continue
         candidate = _find_image_source(image)
         if candidate is None or candidate.source in seen_sources:

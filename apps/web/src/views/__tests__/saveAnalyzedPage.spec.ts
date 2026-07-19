@@ -30,6 +30,7 @@ function createApiCandidate(): Extract<ImageCandidate, { acquisitionMethod: 'api
     ...createCandidate(),
     acquisitionMethod: 'api',
     proxyToken: 'proxy-token',
+    previewToken: 'preview-token',
   }
 }
 

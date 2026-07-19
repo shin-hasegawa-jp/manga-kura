@@ -9,6 +9,23 @@ from app.services.image_candidate_extractor import (
 PAGE_URL = "https://example.com/comic/episode/1"
 
 
+def test_image_input_sources_are_extracted_in_dom_order() -> None:
+    html = """
+      <input type="image" src="/images/page-01.jpg">
+      <img src="/images/page-02.jpg">
+      <input type="IMAGE" src="/images/page-03.jpg">
+      <input type="text" src="/images/not-image.jpg">
+    """
+
+    assert tuple(
+        candidate.image_url for candidate in extract_image_candidates(html, PAGE_URL)
+    ) == (
+        "https://example.com/images/page-01.jpg",
+        "https://example.com/images/page-02.jpg",
+        "https://example.com/images/page-03.jpg",
+    )
+
+
 def test_images_are_extracted_in_dom_order_with_unique_ids() -> None:
     html = """
       <img src="/images/page-01.jpg">

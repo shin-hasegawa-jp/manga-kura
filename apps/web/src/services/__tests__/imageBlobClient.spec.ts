@@ -36,6 +36,7 @@ function createApiCandidate(
     ...createCandidate(id, isSelected),
     acquisitionMethod: 'api',
     proxyToken: `proxy-token-${id}`,
+    previewToken: `preview-token-${id}`,
   }
 }
 
@@ -153,6 +154,52 @@ describe('選択画像のBlob取得', () => {
     })
     expect(fetchProxiedImage).toHaveBeenCalledExactlyOnceWith(candidate.proxyToken)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('API候補の事前寸法取得が失敗していても中継Blobから寸法を取得する', async () => {
+    const candidate = { ...createApiCandidate('1'), width: undefined, height: undefined }
+    const blob = new Blob(['proxied-image'], { type: 'image/jpeg' })
+    const fetchProxiedImage = vi.fn(async () => ({
+      blob,
+      mimeType: 'image/jpeg',
+      fileSize: blob.size,
+    }))
+    const loadBlobDimensions = vi.fn(async () => ({ width: 700, height: 963 }))
+
+    await expect(
+      fetchImageBlob(candidate, {
+        fetch: vi.fn<typeof fetch>(),
+        fetchProxiedImage,
+        loadBlobDimensions,
+      }),
+    ).resolves.toMatchObject({
+      candidateId: candidate.id,
+      width: 700,
+      height: 963,
+      blob,
+    })
+    expect(loadBlobDimensions).toHaveBeenCalledExactlyOnceWith(blob)
+  })
+
+  it('中継Blobからも有効な寸法を取得できない場合は候補付きエラーを返す', async () => {
+    const candidate = { ...createApiCandidate('1'), width: undefined, height: undefined }
+    const blob = new Blob(['invalid-image'], { type: 'image/jpeg' })
+
+    await expect(
+      fetchImageBlob(candidate, {
+        fetch: vi.fn<typeof fetch>(),
+        fetchProxiedImage: vi.fn(async () => ({
+          blob,
+          mimeType: 'image/jpeg',
+          fileSize: blob.size,
+        })),
+        loadBlobDimensions: vi.fn(async () => ({ width: 0, height: 0 })),
+      }),
+    ).rejects.toMatchObject({
+      name: 'ImageBlobFetchError',
+      kind: 'missingDimensions',
+      candidateId: candidate.id,
+    })
   })
 
   it('画像中継APIエラーを候補を特定できる既存エラーへ変換する', async () => {

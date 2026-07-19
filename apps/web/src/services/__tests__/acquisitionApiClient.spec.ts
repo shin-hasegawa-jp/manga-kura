@@ -24,6 +24,7 @@ function createAnalysisResponse(): object {
         imageUrl: 'https://cdn.example.com/001.jpg',
         sourceAttribute: 'data-src',
         proxyToken: 'signed-token',
+        previewToken: 'preview-token',
       },
     ],
   }

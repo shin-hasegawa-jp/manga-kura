@@ -48,6 +48,7 @@ async def test_analyze_endpoint_returns_camel_case_candidates() -> None:
                         source_attribute="src",
                     ),
                     proxy_token="token",
+                    preview_token="preview-token",
                 ),
             ),
         )
@@ -71,6 +72,7 @@ async def test_analyze_endpoint_returns_camel_case_candidates() -> None:
                 "imageUrl": "https://example.com/1.jpg",
                 "sourceAttribute": "src",
                 "proxyToken": "token",
+                "previewToken": "preview-token",
             }
         ],
     }

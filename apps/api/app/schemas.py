@@ -55,6 +55,7 @@ class ImageCandidateResponse(ApiModel):
         "src",
     ]
     proxy_token: str
+    preview_token: str
 
 
 class AnalyzePageResponse(ApiModel):

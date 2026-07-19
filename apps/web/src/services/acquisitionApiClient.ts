@@ -59,6 +59,15 @@ function createApiUrl(path: string, apiBaseUrl: string): URL {
   return new URL(path, baseUrl)
 }
 
+export function createProxiedImageUrl(
+  proxyToken: string,
+  apiBaseUrl = defaultDependencies.apiBaseUrl,
+): string {
+  const url = createApiUrl('v1/images/proxy', apiBaseUrl)
+  url.searchParams.set('token', proxyToken)
+  return url.toString()
+}
+
 async function readJson(response: Response): Promise<unknown> {
   try {
     return await response.json()
@@ -131,12 +140,11 @@ export async function fetchProxiedImage(
   proxyToken: string,
   dependencies: AcquisitionApiClientDependencies = defaultDependencies,
 ): Promise<ProxiedImage> {
-  const url = createApiUrl('v1/images/proxy', dependencies.apiBaseUrl)
-  url.searchParams.set('token', proxyToken)
+  const url = createProxiedImageUrl(proxyToken, dependencies.apiBaseUrl)
 
   let response: Response
   try {
-    response = await dependencies.fetch(url)
+    response = await dependencies.fetch(new URL(url))
   } catch {
     throw new AcquisitionApiClientError('network', '画像中継APIへ接続できませんでした。')
   }

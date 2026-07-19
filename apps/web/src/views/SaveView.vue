@@ -5,6 +5,7 @@ import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration
 import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpisodeRegistration'
 import type { RegistrationImage } from '@/database/registrationService'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
+import { createProxiedImageUrl } from '@/services/acquisitionApiClient'
 import { createSelectedImageBlobFetcher } from '@/services/imageBlobClient'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
 import { getSaveErrorPresentation, markImageFetchFailures } from './acquisitionErrorPresenter'
@@ -72,6 +73,7 @@ async function analyzePageUrl() {
   }
 
   fetchAnalyzedImages = createSelectedImageBlobFetcher()
+  saveFlowError.value = ''
   const result = await analyzePageImages(pageUrl.value, undefined, (state) => {
     pageImageAnalysisState.value = state
   })
@@ -82,6 +84,12 @@ async function analyzePageUrl() {
     standaloneEpisodeSourcePageUrl.value = result.pageUrl
     existingSeriesEpisodeSourcePageUrl.value = result.pageUrl
   }
+}
+
+function getCandidatePreviewUrl(candidate: ImageCandidate): string {
+  return candidate.acquisitionMethod === 'api'
+    ? createProxiedImageUrl(candidate.previewToken)
+    : candidate.imageUrl
 }
 
 function getCurrentRegistrationDetails(): AnalyzedPageRegistrationDetails {
@@ -300,7 +308,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
             <img
               v-if="candidate.fetchStatus !== 'failed'"
               class="image-candidate__preview"
-              :src="candidate.imageUrl"
+              :src="getCandidatePreviewUrl(candidate)"
               :alt="`画像候補 ${candidate.domOrder + 1}`"
             />
             <div v-else class="image-candidate__preview image-candidate__preview--failed">

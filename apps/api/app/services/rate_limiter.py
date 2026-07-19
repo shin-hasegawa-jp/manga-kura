@@ -2,7 +2,7 @@ import asyncio
 import math
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from app.errors import ApiError, ApiErrorCode
 
@@ -45,9 +45,11 @@ class DomainAccessLimiter:
         self,
         interval_seconds: float,
         clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._interval_seconds = interval_seconds
         self._clock = clock
+        self._sleep = sleep
         self._last_access_by_domain: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
@@ -58,11 +60,5 @@ class DomainAccessLimiter:
             if last_access is not None:
                 remaining = last_access + self._interval_seconds - now
                 if remaining > 0:
-                    raise ApiError(
-                        ApiErrorCode.RATE_LIMITED,
-                        {
-                            "retryAfterSeconds": max(1, math.ceil(remaining)),
-                            "scope": "domain",
-                        },
-                    )
-            self._last_access_by_domain[domain] = now
+                    await self._sleep(remaining)
+            self._last_access_by_domain[domain] = self._clock()

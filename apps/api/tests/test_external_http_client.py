@@ -208,6 +208,16 @@ async def test_response_header_limit_is_enforced() -> None:
 @pytest.mark.asyncio
 async def test_domain_interval_is_shared_across_fetch_operations() -> None:
     request_count = 0
+    now = 100.0
+    waits: list[float] = []
+
+    def clock() -> float:
+        return now
+
+    async def sleep(seconds: float) -> None:
+        nonlocal now
+        waits.append(seconds)
+        now += seconds
 
     async def handler(request: httpx.Request) -> httpx.Response:
         nonlocal request_count
@@ -215,7 +225,7 @@ async def test_domain_interval_is_shared_across_fetch_operations() -> None:
         return httpx.Response(200, content=b"ok")
 
     resolver = HostResolverStub({"example.com": ("93.184.216.34",)})
-    domain_limiter = DomainAccessLimiter(60, clock=lambda: 100)
+    domain_limiter = DomainAccessLimiter(60, clock=clock, sleep=sleep)
     client = ExternalHttpClient(
         _settings(),
         resolver,
@@ -226,9 +236,8 @@ async def test_domain_interval_is_shared_across_fetch_operations() -> None:
     async with client.stream("https://example.com/first") as result:
         await result.response.aread()
 
-    with pytest.raises(ApiError) as error:
-        async with client.stream("https://example.com/second"):
-            pass
+    async with client.stream("https://example.com/second") as result:
+        await result.response.aread()
 
-    assert error.value.code is ApiErrorCode.RATE_LIMITED
-    assert request_count == 1
+    assert waits == [60]
+    assert request_count == 2

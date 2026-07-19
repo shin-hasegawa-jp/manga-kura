@@ -106,7 +106,7 @@ export function selectBestSourceFromSrcset(srcset: string): string | undefined {
   return bestCandidate?.source
 }
 
-function findImageSource(image: HTMLImageElement): ExtractedImageSource | undefined {
+function findImageSource(image: Element): ExtractedImageSource | undefined {
   for (const attribute of IMAGE_SOURCE_ATTRIBUTE_PRIORITY) {
     const attributeValue = image.getAttribute(attribute)?.trim() ?? ''
 
@@ -139,7 +139,7 @@ function extractImageSourceCandidatesFromDocument(document: Document): Extracted
   const candidates: ExtractedImageSource[] = []
   const seenSources = new Set<string>()
 
-  for (const image of document.querySelectorAll('img')) {
+  for (const image of document.querySelectorAll('img, input[type="image"]')) {
     const candidate = findImageSource(image)
 
     if (candidate === undefined || seenSources.has(candidate.source)) {
