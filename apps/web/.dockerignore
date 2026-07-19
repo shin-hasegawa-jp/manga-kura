@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+coverage
+test-results
+playwright-report
+.eslintcache
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.git
+.DS_Store

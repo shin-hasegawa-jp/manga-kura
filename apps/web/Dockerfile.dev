@@ -1,0 +1,17 @@
+FROM node:24.15.0-alpine3.23
+
+WORKDIR /app
+
+RUN chown node:node /app
+
+COPY --chown=node:node package.json package-lock.json ./
+
+USER node
+
+RUN npm ci
+
+ENV VITE_FETCH_API_BASE_URL=http://127.0.0.1:17391
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
