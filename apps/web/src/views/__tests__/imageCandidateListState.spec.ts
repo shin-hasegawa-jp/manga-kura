@@ -45,7 +45,7 @@ describe('画像候補一覧の表示状態', () => {
     expect(
       getImageCandidateListState({
         status: 'failure',
-        kind: 'html-fetch-failed',
+        kind: 'api-analysis-failed',
         message: 'ページを取得できませんでした。',
       }),
     ).toEqual({ kind: 'failure', message: 'ページを取得できませんでした。' })

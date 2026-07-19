@@ -4,7 +4,7 @@ import type { ApiImageCandidate } from './acquisitionApiSchemas'
 import { createApiImageCandidates, type ImageCandidate } from './imageCandidateFactory'
 import { scoreAndSelectImageCandidates } from './imageCandidateScorer'
 
-export type PageImageAnalysisFailureKind = 'invalid-url' | 'html-fetch-failed' | 'analysis-failed'
+export type PageImageAnalysisFailureKind = 'invalid-url' | 'api-analysis-failed' | 'analysis-failed'
 
 export type PageImageAnalysisState =
   | { status: 'analyzing' }
@@ -71,7 +71,7 @@ export async function analyzePageImages(
   } catch (cause) {
     const state: PageImageAnalysisState = {
       status: 'failure',
-      kind: 'html-fetch-failed',
+      kind: 'api-analysis-failed',
       message: getFailureMessage(cause, 'ページの取得に失敗しました。'),
       cause,
     }

@@ -136,7 +136,7 @@ describe('ページ画像解析フロー', () => {
 
     await expect(analyzePageImages(pageUrl, dependencies)).resolves.toEqual({
       status: 'failure',
-      kind: 'html-fetch-failed',
+      kind: 'api-analysis-failed',
       message: apiError.message,
       cause: apiError,
     })
@@ -158,7 +158,7 @@ describe('ページ画像解析フロー', () => {
       analyzePageImages(pageUrl, dependencies, (state) => statuses.push(state.status)),
     ).resolves.toEqual({
       status: 'failure',
-      kind: 'html-fetch-failed',
+      kind: 'api-analysis-failed',
       message: conversionError.message,
       cause: conversionError,
     })

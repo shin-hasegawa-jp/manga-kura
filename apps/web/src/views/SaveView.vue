@@ -271,9 +271,6 @@ function selectRegistrationMode(mode: RegistrationMode) {
         {{ imageCandidateListState.message }}
       </p>
       <template v-else-if="imageCandidateListState.kind === 'populated'">
-        <p class="image-candidates__acquisition-method" role="status">
-          このページは取得API経由で解析しました。
-        </p>
         <div class="image-candidates__selection-actions" aria-label="画像候補の一括選択">
           <button
             type="button"

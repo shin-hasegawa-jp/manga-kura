@@ -1,7 +1,7 @@
 import type { ImageBlobFetchError } from '@/services/imageBlobClient'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import type { PageImageAnalysisState } from '@/services/pageImageAnalyzer'
-import { PageHtmlFetchError } from '@/services/pageHtmlClient'
+import { AcquisitionApiClientError } from '@/services/acquisitionApiClient'
 import type { SaveAnalyzedPageResult } from './saveAnalyzedPage'
 
 export interface AcquisitionErrorPresentation {
@@ -25,22 +25,28 @@ export function getPageAnalysisErrorPresentation(
     return { message: state.message, canRetry: true }
   }
 
-  if (state.cause instanceof PageHtmlFetchError) {
+  if (state.cause instanceof AcquisitionApiClientError) {
     switch (state.cause.kind) {
       case 'network':
         return {
           message:
-            'ページへ接続できませんでした。サイトのCORS設定または通信状態を確認して再試行してください。',
+            'ページ解析APIへ接続できませんでした。APIの稼働状況と通信状態を確認してください。',
           canRetry: true,
         }
-      case 'http':
+      case 'api':
         return {
-          message: `ページの取得に失敗しました（HTTP ${state.cause.status ?? 'エラー'}）。URLを確認して再試行してください。`,
-          canRetry: true,
+          message: `${state.cause.message}（HTTP ${state.cause.status ?? 'エラー'}）`,
+          canRetry: state.cause.retryable ?? true,
         }
       case 'unsupportedContentType':
         return {
-          message: `取得先はHTMLではありません（${state.cause.contentType || 'Content-Type不明'}）。HTMLページのURLを入力してください。`,
+          message: `ページ解析APIから対応していない形式が返されました（${state.cause.contentType || 'Content-Type不明'}）。`,
+          canRetry: true,
+        }
+      case 'invalidResponse':
+        return {
+          message:
+            'ページ解析APIから不正なレスポンスが返されました。時間をおいて再試行してください。',
           canRetry: true,
         }
     }
@@ -60,11 +66,11 @@ function getImageFailureLabel(
 
   switch (failure.kind) {
     case 'http':
-      return `${candidateLabel}（HTTP ${failure.status ?? 'エラー'}）`
+      return `${candidateLabel}（画像中継API HTTP ${failure.status ?? 'エラー'}）`
     case 'network':
-      return `${candidateLabel}（通信またはCORSエラー）`
+      return `${candidateLabel}（画像中継APIの通信エラー）`
     case 'unsupportedContentType':
-      return `${candidateLabel}（画像以外のContent-Type）`
+      return `${candidateLabel}（画像中継APIから画像以外のデータを受信）`
     case 'missingDimensions':
       return `${candidateLabel}（画像サイズ取得失敗）`
   }
