@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { mdiBookshelf, mdiPlus } from '@mdi/js'
+import { mdiBookshelf, mdiMagnify, mdiPlus } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository, type TopLevelLibraryEntry } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
@@ -12,6 +12,7 @@ import AppThumbnail from '@/components/AppThumbnail.vue'
 import { loadLibrarySortOrder, saveLibrarySortOrder } from '@/database/librarySettingsService'
 import { createLibraryListItemPresenter, type LibraryListItem } from './libraryListItemPresenter'
 import { getLibraryListState } from './libraryListState'
+import { filterLibraryEntries } from './librarySearch'
 import {
   DEFAULT_LIBRARY_SORT_ORDER,
   LIBRARY_SORT_ORDER_LABELS,
@@ -26,20 +27,40 @@ const entries = ref<TopLevelLibraryEntry[]>()
 const libraryState = computed(() => getLibraryListState(entries.value))
 const libraryItems = ref<LibraryListItem[]>([])
 const sortOrder = ref<LibrarySortOrder>(DEFAULT_LIBRARY_SORT_ORDER)
+const searchQuery = ref('')
+const searchIndex = ref<ReadonlyMap<string, string>>(new Map())
+const isSearching = computed(() => searchQuery.value.trim() !== '')
+const hasNoSearchResults = computed(
+  () =>
+    libraryState.value.kind === 'populated' && isSearching.value && libraryItems.value.length === 0,
+)
 
 function renderItems() {
   const sorted = sortLibraryEntries(entries.value ?? [], sortOrder.value)
-  libraryItems.value = itemPresenter.present(sorted)
+  const filtered = filterLibraryEntries(sorted, searchQuery.value, searchIndex.value)
+  libraryItems.value = itemPresenter.present(filtered)
 }
 
 async function loadLibrary() {
-  const [savedEntries, savedSortOrder] = await Promise.all([
+  const [savedEntries, savedSortOrder, savedSearchIndex] = await Promise.all([
     repository.topLevelLibrary.findAll(),
     loadLibrarySortOrder(repository),
+    repository.librarySearch.buildIndex(),
   ])
 
   entries.value = savedEntries
   sortOrder.value = savedSortOrder
+  searchIndex.value = savedSearchIndex
+  renderItems()
+}
+
+function onSearchInput(event: Event) {
+  searchQuery.value = (event.target as HTMLInputElement).value
+  renderItems()
+}
+
+function clearSearch() {
+  searchQuery.value = ''
   renderItems()
 }
 
@@ -81,6 +102,19 @@ onBeforeUnmount(() => itemPresenter.dispose())
       </label>
     </header>
 
+    <!-- 検索：データがある通常表示のときだけ操作可能にする -->
+    <div v-if="libraryState.kind === 'populated'" class="library-search">
+      <AppIcon :path="mdiMagnify" :size="20" class="library-search__icon" aria-hidden="true" />
+      <input
+        type="search"
+        class="app-field library-search__input"
+        :value="searchQuery"
+        placeholder="タイトル・URLで検索"
+        aria-label="本棚を検索"
+        @input="onSearchInput"
+      />
+    </div>
+
     <!-- 読み込み中：本棚のスケルトン -->
     <template v-if="libraryState.kind === 'loading'">
       <p class="visually-hidden" role="status">本棚を読み込んでいます</p>
@@ -106,6 +140,20 @@ onBeforeUnmount(() => itemPresenter.dispose())
         <AppIcon :path="mdiPlus" :size="20" />
         漫画を保存する
       </RouterLink>
+    </div>
+
+    <!-- 検索結果なし -->
+    <div v-else-if="hasNoSearchResults" class="library-empty">
+      <div class="library-empty__icon" aria-hidden="true">
+        <AppIcon :path="mdiMagnify" :size="40" />
+      </div>
+      <h2 class="app-heading library-empty__title">見つかりませんでした</h2>
+      <p class="library-empty__message">
+        「{{ searchQuery.trim() }}」に一致する作品や話はありません。
+      </p>
+      <button type="button" class="app-btn app-btn--secondary" @click="clearSearch">
+        検索を解除
+      </button>
     </div>
 
     <!-- 通常：作品・単独の話を同じグリッドに混在 -->
@@ -166,6 +214,25 @@ onBeforeUnmount(() => itemPresenter.dispose())
 
 .library-sort {
   margin-left: auto;
+}
+
+.library-search {
+  position: relative;
+  margin-bottom: var(--app-space-md);
+}
+
+.library-search__icon {
+  position: absolute;
+  top: 50%;
+  left: var(--app-space-xs);
+  color: var(--app-color-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.library-search__input {
+  width: 100%;
+  padding-left: calc(var(--app-space-xs) * 2 + 1.25rem);
 }
 
 .library-sort__select {
