@@ -36,6 +36,7 @@ export interface ComicImageRepository extends EntityRepository<ComicImage> {
 
 export interface EpisodeRepository extends EntityRepository<Episode> {
   findBySourcePageUrl(sourcePageUrl: string): Promise<Episode | undefined>
+  findAllBySourcePageUrl(sourcePageUrl: string): Promise<Episode[]>
 }
 
 export interface LibraryEntry {
@@ -117,6 +118,9 @@ function createEpisodeRepository(table: Table<Episode, string>): EpisodeReposito
     ...repository,
     findBySourcePageUrl(sourcePageUrl: string) {
       return table.where('sourcePageUrl').equals(sourcePageUrl).first()
+    },
+    findAllBySourcePageUrl(sourcePageUrl: string) {
+      return table.where('sourcePageUrl').equals(sourcePageUrl).toArray()
     },
   }
 }
