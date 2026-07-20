@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { mdiAlertOutline, mdiChevronLeft } from '@mdi/js'
+import { mdiAlertOutline, mdiChevronLeft, mdiTrashCanOutline } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository } from '@/database/repository'
+import { createDeletionService } from '@/database/deletionService'
 import { APP_SETTINGS_ID } from '@/database/librarySettingsService'
 import { DEFAULT_STORAGE_WARNING_THRESHOLD_BYTES } from '@/domain/models'
 import type { StorageUsage } from '@/database/storageUsage'
+import { useDeleteConfirm } from '@/composables/useDeleteConfirm'
+import { useDeletionNotice } from '@/composables/useDeletionNotice'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import { getDeleteConfirmation } from './deleteConfirmation'
 import {
   buildStorageListItems,
   formatBytes,
@@ -15,9 +20,19 @@ import {
   getStorageWarningStatus,
   readStorageEstimate,
   type StorageEstimate,
+  type StorageListItem,
 } from './storageOverview'
 
 const repository = createMangaRepository(database)
+const deletionService = createDeletionService(database)
+const { notify } = useDeletionNotice()
+const {
+  target: deleteTarget,
+  isDeleting,
+  request: requestDelete,
+  cancel: cancelDelete,
+  confirm: confirmDelete,
+} = useDeleteConfirm()
 const isLoading = ref(true)
 const usage = ref<StorageUsage>()
 const estimate = ref<StorageEstimate>()
@@ -49,6 +64,30 @@ async function loadStorage() {
   warningThresholdBytes.value =
     settings?.storageSettings.warningThresholdBytes ?? DEFAULT_STORAGE_WARNING_THRESHOLD_BYTES
   isLoading.value = false
+}
+
+function askDeleteItem(item: StorageListItem) {
+  if (item.kind === 'series') {
+    requestDelete({ kind: 'series', title: item.title }, async () => {
+      await deletionService.deleteSeries(item.id)
+      notify('作品を削除しました')
+      await loadStorage()
+    })
+    return
+  }
+  requestDelete({ kind: 'episode', title: item.title }, async () => {
+    await deletionService.deleteEpisode(item.id)
+    notify('話を削除しました')
+    await loadStorage()
+  })
+}
+
+function askDeleteAllData() {
+  requestDelete({ kind: 'allData' }, async () => {
+    await deletionService.deleteAllData()
+    notify('すべてのデータを削除しました')
+    await loadStorage()
+  })
 }
 
 onMounted(loadStorage)
@@ -127,6 +166,14 @@ onMounted(loadStorage)
                   >
                 </span>
                 <span class="storage-item__size">{{ formatBytes(item.bytes) }}</span>
+                <button
+                  class="storage-item__delete"
+                  type="button"
+                  :aria-label="`${item.title}を削除`"
+                  @click.prevent="askDeleteItem(item)"
+                >
+                  <AppIcon :path="mdiTrashCanOutline" :size="20" />
+                </button>
               </summary>
               <ul class="storage-episode-list">
                 <li v-for="episode in item.episodes" :key="episode.episodeId">
@@ -145,11 +192,36 @@ onMounted(loadStorage)
                 </span>
               </span>
               <span class="storage-item__size">{{ formatBytes(item.bytes) }}</span>
+              <button
+                class="storage-item__delete"
+                type="button"
+                :aria-label="`${item.title}を削除`"
+                @click="askDeleteItem(item)"
+              >
+                <AppIcon :path="mdiTrashCanOutline" :size="20" />
+              </button>
             </div>
           </li>
         </ul>
       </section>
+
+      <!-- 全データ削除（納品デザイン11） -->
+      <button
+        class="app-btn app-btn--outline app-btn--danger-outline"
+        type="button"
+        @click="askDeleteAllData"
+      >
+        すべてのデータを削除
+      </button>
     </template>
+
+    <AppConfirmDialog
+      v-if="deleteTarget"
+      v-bind="getDeleteConfirmation(deleteTarget)"
+      :busy="isDeleting"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
   </main>
 </template>
 
@@ -313,6 +385,24 @@ details[open] .storage-item {
 .storage-item__size {
   flex: 0 0 auto;
   font-weight: var(--app-font-weight-bold);
+}
+
+.storage-item__delete {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--app-color-error);
+  background: transparent;
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+}
+
+.storage-item__delete:focus-visible {
+  outline: 0.1875rem solid var(--app-color-error);
+  outline-offset: 0.125rem;
 }
 
 .storage-episode-list {

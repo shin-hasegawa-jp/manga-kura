@@ -3,9 +3,11 @@ import { computed } from 'vue'
 import { RouterView } from 'vue-router'
 import { useRoute } from 'vue-router'
 import AppNavigation from './components/AppNavigation.vue'
+import { useDeletionNotice } from './composables/useDeletionNotice'
 
 const route = useRoute()
 const isReader = computed(() => route.meta.reader === true)
+const { message: deletionNotice } = useDeletionNotice()
 </script>
 
 <template>
@@ -19,6 +21,13 @@ const isReader = computed(() => route.meta.reader === true)
     </v-main>
 
     <AppNavigation v-if="!isReader" />
+
+    <!-- 削除後通知（納品デザイン13） -->
+    <Transition name="app-toast">
+      <p v-if="deletionNotice" class="app-toast" role="status" aria-live="polite">
+        {{ deletionNotice }}
+      </p>
+    </Transition>
   </v-app>
 </template>
 
@@ -39,5 +48,39 @@ const isReader = computed(() => route.meta.reader === true)
   width: 100%;
   max-width: var(--app-content-max-width);
   padding: 0;
+}
+
+/* ---- 削除後通知トースト ---- */
+.app-toast {
+  position: fixed;
+  z-index: 200;
+  right: var(--app-space-sm);
+  bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  left: var(--app-space-sm);
+  max-width: var(--app-content-max-width);
+  margin: 0 auto;
+  padding: var(--app-space-xs) var(--app-space-sm);
+  color: var(--app-color-on-cta);
+  font-size: var(--app-font-size-sm);
+  text-align: center;
+  background: var(--app-color-cta);
+  border-radius: var(--app-radius-md);
+}
+
+.app-toast-enter-active,
+.app-toast-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.app-toast-enter-from,
+.app-toast-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast-enter-active,
+  .app-toast-leave-active {
+    transition: none;
+  }
 }
 </style>
