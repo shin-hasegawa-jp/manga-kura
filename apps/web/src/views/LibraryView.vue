@@ -9,20 +9,50 @@ import { getStandaloneEpisodeReaderRoute } from '@/router/readerRoute'
 import AppIcon from '@/components/AppIcon.vue'
 import AppKindBadge from '@/components/AppKindBadge.vue'
 import AppThumbnail from '@/components/AppThumbnail.vue'
+import { loadLibrarySortOrder, saveLibrarySortOrder } from '@/database/librarySettingsService'
 import { createLibraryListItemPresenter, type LibraryListItem } from './libraryListItemPresenter'
 import { getLibraryListState } from './libraryListState'
+import {
+  DEFAULT_LIBRARY_SORT_ORDER,
+  LIBRARY_SORT_ORDER_LABELS,
+  LIBRARY_SORT_ORDERS,
+  sortLibraryEntries,
+  type LibrarySortOrder,
+} from './librarySort'
 
 const repository = createMangaRepository(database)
 const itemPresenter = createLibraryListItemPresenter(createObjectUrlRegistry())
 const entries = ref<TopLevelLibraryEntry[]>()
 const libraryState = computed(() => getLibraryListState(entries.value))
 const libraryItems = ref<LibraryListItem[]>([])
+const sortOrder = ref<LibrarySortOrder>(DEFAULT_LIBRARY_SORT_ORDER)
+
+function renderItems() {
+  const sorted = sortLibraryEntries(entries.value ?? [], sortOrder.value)
+  libraryItems.value = itemPresenter.present(sorted)
+}
 
 async function loadLibrary() {
-  const savedEntries = await repository.topLevelLibrary.findAll()
+  const [savedEntries, savedSortOrder] = await Promise.all([
+    repository.topLevelLibrary.findAll(),
+    loadLibrarySortOrder(repository),
+  ])
 
   entries.value = savedEntries
-  libraryItems.value = itemPresenter.present(savedEntries)
+  sortOrder.value = savedSortOrder
+  renderItems()
+}
+
+async function changeSortOrder(order: LibrarySortOrder) {
+  if (order === sortOrder.value) return
+
+  sortOrder.value = order
+  renderItems()
+  await saveLibrarySortOrder(repository, order)
+}
+
+function onSortOrderChange(event: Event) {
+  void changeSortOrder((event.target as HTMLSelectElement).value as LibrarySortOrder)
 }
 
 onMounted(loadLibrary)
@@ -36,6 +66,19 @@ onBeforeUnmount(() => itemPresenter.dispose())
       <p v-if="libraryState.kind === 'populated'" class="library-header__count">
         全{{ libraryItems.length }}件
       </p>
+      <!-- 並べ替えは項目がある通常表示のときだけ操作可能にする -->
+      <label v-if="libraryState.kind === 'populated'" class="library-sort">
+        <span class="visually-hidden">並び順</span>
+        <select
+          class="app-field library-sort__select"
+          :value="sortOrder"
+          @change="onSortOrderChange"
+        >
+          <option v-for="order in LIBRARY_SORT_ORDERS" :key="order" :value="order">
+            {{ LIBRARY_SORT_ORDER_LABELS[order] }}
+          </option>
+        </select>
+      </label>
     </header>
 
     <!-- 読み込み中：本棚のスケルトン -->
@@ -118,6 +161,15 @@ onBeforeUnmount(() => itemPresenter.dispose())
 .library-header__count {
   margin: 0;
   color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
+}
+
+.library-sort {
+  margin-left: auto;
+}
+
+.library-sort__select {
+  min-height: 2.5rem;
   font-size: var(--app-font-size-sm);
 }
 

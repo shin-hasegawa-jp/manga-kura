@@ -7,6 +7,13 @@ export {
   type LibrarySortOrder,
 } from '@/domain/models'
 
+export const LIBRARY_SORT_ORDER_LABELS: Record<LibrarySortOrder, string> = {
+  recentlyRead: '最近読んだ順',
+  recentlyAdded: '最近追加した順',
+  recentlyUpdated: '更新日時順',
+  title: 'タイトル順',
+}
+
 interface SortableEntry {
   id: string
   title: string
