@@ -12,7 +12,7 @@ export interface MangaRepository {
   series: EntityRepository<Series>
   episodes: EpisodeRepository
   images: ComicImageRepository
-  settings: EntityRepository
+  settings: EntityRepository<AppSettings>
   library: LibraryRepository
   topLevelLibrary: TopLevelLibraryRepository
   seriesDetails: SeriesDetailsRepository

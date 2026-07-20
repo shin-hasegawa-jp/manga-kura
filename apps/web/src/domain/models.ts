@@ -6,6 +6,17 @@ const nonNegativeIntegerSchema = v.pipe(v.number(), v.integer(), v.minValue(0))
 const positiveIntegerSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
 const urlSchema = v.pipe(v.string(), v.url())
 
+export const LIBRARY_SORT_ORDERS = [
+  'recentlyRead',
+  'recentlyAdded',
+  'recentlyUpdated',
+  'title',
+] as const
+
+export type LibrarySortOrder = (typeof LIBRARY_SORT_ORDERS)[number]
+
+export const DEFAULT_LIBRARY_SORT_ORDER: LibrarySortOrder = 'recentlyRead'
+
 export const seriesSchema = v.object({
   id: idSchema,
   title: titleSchema,
@@ -46,7 +57,7 @@ export const comicImageSchema = v.object({
 
 export const appSettingsSchema = v.object({
   id: v.literal('app'),
-  sortOrder: v.picklist(['recentlyRead', 'recentlyAdded']),
+  sortOrder: v.picklist(LIBRARY_SORT_ORDERS),
   displaySettings: v.object({
     theme: v.picklist(['system', 'light', 'dark']),
   }),

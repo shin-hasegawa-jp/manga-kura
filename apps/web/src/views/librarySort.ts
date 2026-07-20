@@ -1,16 +1,11 @@
-import type { Series } from '@/domain/models'
+import { type LibrarySortOrder, type Series } from '@/domain/models'
 import type { TopLevelLibraryEntry } from '@/database/repository'
 
-export type LibrarySortOrder = 'recentlyRead' | 'recentlyAdded' | 'recentlyUpdated' | 'title'
-
-export const LIBRARY_SORT_ORDERS: readonly LibrarySortOrder[] = [
-  'recentlyRead',
-  'recentlyAdded',
-  'recentlyUpdated',
-  'title',
-]
-
-export const DEFAULT_LIBRARY_SORT_ORDER: LibrarySortOrder = 'recentlyRead'
+export {
+  DEFAULT_LIBRARY_SORT_ORDER,
+  LIBRARY_SORT_ORDERS,
+  type LibrarySortOrder,
+} from '@/domain/models'
 
 interface SortableEntry {
   id: string
