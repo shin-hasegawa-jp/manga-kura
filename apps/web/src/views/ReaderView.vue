@@ -4,16 +4,22 @@ import { RouterLink, useRoute } from 'vue-router'
 import { mdiAlertOutline, mdiCheck, mdiChevronLeft, mdiImageOffOutline, mdiReload } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository } from '@/database/repository'
+import { createReadingProgressService } from '@/database/readingProgressService'
 import type { ComicImage, Episode, Series } from '@/domain/models'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
 import { getReaderRouteTarget, isReaderRouteTargetValid } from '@/router/readerRoute'
 import AppIcon from '@/components/AppIcon.vue'
 import { createReaderImagePresenter, type ReaderImageItem } from './readerImagePresenter'
+import { computeReadingPosition, shouldPersistReadingPosition } from './readingPositionTracker'
 import { getReaderBackRoute, getReaderViewState } from './readerViewState'
+
+const READING_POSITION_SAVE_INTERVAL_MS = 2000
 
 const route = useRoute()
 const repository = createMangaRepository(database)
+const readingProgressService = createReadingProgressService(database)
 const imagePresenter = createReaderImagePresenter(createObjectUrlRegistry())
+let lastPersistedAt: number | undefined
 const isLoading = ref(true)
 const episode = ref<Episode>()
 const series = ref<Series>()
@@ -36,11 +42,14 @@ const progress = computed(() =>
 )
 
 async function loadReader() {
+  // 別の話へ切り替える前に、直前の話の閲覧位置を確定保存する
+  persistReadingPosition(true)
   isLoading.value = true
   imagePresenter.dispose()
   failedImageIds.value = new Set()
   currentImage.value = 1
   hasReachedEnd.value = false
+  lastPersistedAt = undefined
 
   const routeTarget = getReaderRouteTarget(
     route.name,
@@ -100,13 +109,45 @@ function updateReadingPosition() {
     window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24
 }
 
+function persistReadingPosition(force = false) {
+  const currentEpisode = episode.value
+  if (currentEpisode === undefined || imageItems.value.length === 0) return
+
+  const nowMs = Date.now()
+  if (
+    !force &&
+    !shouldPersistReadingPosition(lastPersistedAt, nowMs, READING_POSITION_SAVE_INTERVAL_MS)
+  ) {
+    return
+  }
+
+  const documentElement = document.documentElement
+  const scrollableHeight = documentElement.scrollHeight - window.innerHeight
+  const measurement = computeReadingPosition(
+    window.scrollY,
+    scrollableHeight,
+    documentElement.scrollHeight,
+  )
+  lastPersistedAt = nowMs
+  void readingProgressService.recordPosition({
+    episodeId: currentEpisode.id,
+    ...measurement,
+  })
+}
+
+function onReaderScroll() {
+  updateReadingPosition()
+  persistReadingPosition()
+}
+
 watch(() => route.fullPath, loadReader)
 onMounted(() => {
   void loadReader()
-  window.addEventListener('scroll', updateReadingPosition, { passive: true })
+  window.addEventListener('scroll', onReaderScroll, { passive: true })
 })
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', updateReadingPosition)
+  window.removeEventListener('scroll', onReaderScroll)
+  persistReadingPosition(true)
   imagePresenter.dispose()
 })
 </script>
