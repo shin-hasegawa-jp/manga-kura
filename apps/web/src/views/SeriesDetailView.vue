@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { mdiAlertCircleOutline, mdiChevronLeft, mdiTextBoxOutline } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository, type SeriesDetails } from '@/database/repository'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import { getSeriesEpisodeReaderRoute } from '@/router/readerRoute'
+import AppIcon from '@/components/AppIcon.vue'
+import AppThumbnail from '@/components/AppThumbnail.vue'
 import { getSeriesDetailState } from './seriesDetailState'
 import {
   createSeriesEpisodeListItemPresenter,
@@ -17,6 +21,8 @@ const isLoading = ref(true)
 const details = ref<SeriesDetails>()
 const episodeItems = ref<SeriesEpisodeListItem[]>([])
 const detailState = computed(() => getSeriesDetailState(isLoading.value, details.value))
+// 作品サムネイルは本棚と同じく先頭話のサムネイルを流用する
+const seriesThumbnailUrl = computed(() => episodeItems.value[0]?.thumbnailUrl)
 
 function getRouteSeriesId(): string {
   const routeSeriesId = route.params.seriesId
@@ -42,47 +48,71 @@ onBeforeUnmount(() => itemPresenter.dispose())
 </script>
 
 <template>
-  <main>
-    <nav aria-label="パンくず" class="breadcrumb">
-      <RouterLink :to="{ name: 'library' }">ライブラリ</RouterLink>
-      <span aria-hidden="true">/</span>
-      <span>{{ details?.series.title ?? '作品' }}</span>
-    </nav>
+  <main class="series-detail">
+    <RouterLink
+      class="app-icon-btn series-detail__back"
+      :to="{ name: 'library' }"
+      aria-label="本棚へ戻る"
+    >
+      <AppIcon :path="mdiChevronLeft" :size="28" />
+    </RouterLink>
 
-    <RouterLink class="back-link" :to="{ name: 'library' }">← ライブラリへ戻る</RouterLink>
-
-    <p v-if="detailState.kind === 'loading'" class="status-message">読込中…</p>
-
-    <p v-else-if="detailState.kind === 'notFound'" class="status-message" role="alert">
-      指定された作品が見つかりません。
+    <p v-if="detailState.kind === 'loading'" class="app-message app-message--info" role="status">
+      読込中…
     </p>
+
+    <!-- Not Found：空状態と区別した表示 -->
+    <div v-else-if="detailState.kind === 'notFound'" class="series-state" role="alert">
+      <div class="series-state__icon" aria-hidden="true">
+        <AppIcon :path="mdiAlertCircleOutline" :size="40" />
+      </div>
+      <h1 class="app-heading series-state__title">作品が見つかりません</h1>
+      <p class="series-state__message">
+        指定された作品は削除されたか、URLが正しくない可能性があります。
+      </p>
+      <RouterLink class="app-btn app-btn--secondary" :to="{ name: 'library' }">
+        本棚へ戻る
+      </RouterLink>
+    </div>
 
     <template v-else-if="details">
       <header class="series-header">
-        <p class="series-kind">作品</p>
-        <h1>{{ details.series.title }}</h1>
-        <p>全{{ details.episodes.length }}話</p>
+        <div class="series-header__thumb">
+          <AppThumbnail :src="seriesThumbnailUrl" :label="details.series.title" ratio="3 / 4" />
+        </div>
+        <div class="series-header__meta">
+          <h1 class="app-heading series-header__title">{{ details.series.title }}</h1>
+          <p class="series-header__count">全{{ details.episodes.length }}話</p>
+        </div>
       </header>
 
-      <p v-if="detailState.kind === 'empty'" class="status-message">
-        この作品には話が登録されていません。
-      </p>
+      <h2 class="series-detail__section-title">話一覧</h2>
+
+      <!-- 話なし：空状態 -->
+      <div v-if="detailState.kind === 'empty'" class="series-state series-state--inline">
+        <div class="series-state__icon" aria-hidden="true">
+          <AppIcon :path="mdiTextBoxOutline" :size="40" />
+        </div>
+        <p class="series-state__title app-heading">まだ話がありません</p>
+        <p class="series-state__message">この作品に最初の話を追加しよう。</p>
+      </div>
 
       <ul v-else class="episode-list">
-        <li v-for="item in episodeItems" :key="item.episodeId" class="episode-item">
-          <img
-            v-if="item.thumbnailUrl"
-            class="thumbnail"
-            :src="item.thumbnailUrl"
-            :alt="`${item.title}のサムネイル`"
-          />
-          <div v-else class="thumbnail thumbnail-placeholder" aria-hidden="true">画像なし</div>
-          <div>
-            <p v-if="item.episodeNumberLabel" class="episode-number">
-              {{ item.episodeNumberLabel }}
-            </p>
-            <h2>{{ item.title }}</h2>
-          </div>
+        <li v-for="item in episodeItems" :key="item.episodeId">
+          <RouterLink
+            class="episode-item"
+            :to="getSeriesEpisodeReaderRoute(details.series.id, item.episodeId)"
+          >
+            <div class="episode-item__thumb">
+              <AppThumbnail :src="item.thumbnailUrl" :label="item.title" />
+            </div>
+            <h3 class="episode-item__title">
+              <span v-if="item.episodeNumberLabel" class="episode-item__number">
+                {{ item.episodeNumberLabel }}
+              </span>
+              {{ item.title }}
+            </h3>
+          </RouterLink>
         </li>
       </ul>
     </template>
@@ -90,60 +120,50 @@ onBeforeUnmount(() => itemPresenter.dispose())
 </template>
 
 <style scoped>
-h1,
-h2,
-p {
-  margin: 0;
+.series-detail__back {
+  margin-left: calc(var(--app-space-2xs) * -1);
+  margin-bottom: var(--app-space-2xs);
 }
 
-h1 {
-  font-size: 1.5rem;
-}
-
-.breadcrumb {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.75rem;
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.875rem;
-}
-
-.breadcrumb a,
-.back-link {
-  color: rgb(var(--v-theme-primary));
-}
-
-.back-link {
-  display: inline-block;
-  margin-bottom: 1.5rem;
-}
-
+/* ---- 作品ヘッダー ---- */
 .series-header {
-  margin-bottom: 1.5rem;
+  display: flex;
+  gap: var(--app-space-sm);
+  margin-bottom: var(--app-space-md);
 }
 
-.series-header h1 {
-  margin: 0.25rem 0;
+.series-header__thumb {
+  flex: 0 0 auto;
+  width: 7.5rem;
 }
 
-.series-kind,
-.series-header p,
-.episode-number {
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.875rem;
+.series-header__meta {
+  display: grid;
+  align-content: start;
+  gap: var(--app-space-3xs);
+  padding-top: var(--app-space-2xs);
 }
 
-.status-message {
-  padding: 1rem;
-  color: rgb(var(--v-theme-on-surface));
-  background: rgb(var(--v-theme-surface-variant));
-  border-radius: 0.5rem;
+.series-header__title {
+  margin: 0;
+  font-size: var(--app-font-size-xl);
 }
 
+.series-header__count {
+  margin: 0;
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
+}
+
+.series-detail__section-title {
+  margin: 0 0 var(--app-space-xs);
+  font-size: var(--app-font-size-lg);
+}
+
+/* ---- 話一覧 ---- */
 .episode-list {
   display: grid;
-  gap: 0.75rem;
+  gap: 0;
   padding: 0;
   margin: 0;
   list-style: none;
@@ -151,32 +171,61 @@ h1 {
 
 .episode-item {
   display: flex;
-  gap: 1rem;
+  gap: var(--app-space-sm);
   align-items: center;
-  padding: 0.75rem;
-  border: 1px solid rgb(var(--v-theme-outline-variant));
-  border-radius: 0.5rem;
+  padding: var(--app-space-xs) 0;
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--app-color-border);
 }
 
-.episode-item h2 {
-  margin-top: 0.25rem;
-  font-size: 1rem;
-}
-
-.thumbnail {
-  display: block;
+.episode-item__thumb {
   flex: 0 0 auto;
   width: 3.5rem;
-  height: 3.5rem;
-  object-fit: cover;
-  border-radius: 0.4rem;
 }
 
-.thumbnail-placeholder {
+.episode-item__title {
+  margin: 0;
+  font-size: var(--app-font-size-md);
+  font-weight: var(--app-font-weight-bold);
+}
+
+.episode-item__number {
+  margin-right: var(--app-space-3xs);
+}
+
+/* ---- 空状態・Not Found ---- */
+.series-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--app-space-2xs);
+  padding: var(--app-space-xl) var(--app-space-sm);
+  text-align: center;
+}
+
+.series-state--inline {
+  padding-top: var(--app-space-lg);
+}
+
+.series-state__icon {
   display: grid;
   place-items: center;
-  color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.75rem;
-  background: rgb(var(--v-theme-surface-variant));
+  width: 5rem;
+  height: 5rem;
+  margin-bottom: var(--app-space-2xs);
+  color: var(--app-color-text-muted);
+  background: var(--app-color-panel);
+  border-radius: var(--app-radius-xl);
+}
+
+.series-state__title {
+  margin: 0;
+  font-size: var(--app-font-size-lg);
+}
+
+.series-state__message {
+  max-width: 20rem;
+  margin: 0 0 var(--app-space-2xs);
+  color: var(--app-color-text-muted);
 }
 </style>

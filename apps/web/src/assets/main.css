@@ -1,13 +1,36 @@
+/* ベース要素スタイル。値は tokens.css の共通デザイントークンを参照する。 */
+
 html {
   min-width: 20rem;
-  background: rgb(var(--v-theme-background));
+  background: var(--app-color-bg);
 }
 
 body {
   min-height: 100vh;
   margin: 0;
+  color: var(--app-color-text);
+  font-family: var(--app-font-family-sans);
+  font-size: var(--app-font-size-md);
+  line-height: var(--app-line-height-body);
 }
 
 #app {
   min-height: 100vh;
+}
+
+/* Vuetifyコンポーネントにも本文フォントを適用する */
+.v-application {
+  font-family: var(--app-font-family-sans);
+}
+
+/* 画面タイトル等の見出しは明朝を基調にする */
+.app-heading,
+.app-display {
+  font-family: var(--app-font-family-serif);
+  line-height: var(--app-line-height-heading);
+}
+
+.app-display {
+  font-size: var(--app-font-size-display);
+  font-weight: var(--app-font-weight-bold);
 }
