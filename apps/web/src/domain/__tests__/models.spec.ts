@@ -32,6 +32,25 @@ describe('ドメインモデルのバリデーション', () => {
     expect(() => validateEpisode({ ...episode, sourcePageUrl: 'not-a-url' })).toThrow()
   })
 
+  it('話へ任意の保存時コンテンツ高さを保持し、負の値を拒否する', () => {
+    const episode = {
+      id: 'episode-1',
+      title: '第1話',
+      sourcePageUrl: 'https://example.com/episodes/1',
+      createdAt: now,
+      updatedAt: now,
+      scrollPosition: 1200,
+      scrollProgress: 0.5,
+      savedContentHeight: 2400,
+    }
+
+    expect(validateEpisode(episode)).toEqual(episode)
+    expect(validateEpisode({ ...episode, savedContentHeight: undefined }).savedContentHeight).toBe(
+      undefined,
+    )
+    expect(() => validateEpisode({ ...episode, savedContentHeight: -1 })).toThrow()
+  })
+
   it('画像を検証し、バイナリデータがない場合を拒否する', () => {
     const image = {
       id: 'image-1',

@@ -28,6 +28,7 @@ export const episodeSchema = v.object({
   thumbnailImageId: v.optional(idSchema),
   scrollPosition: v.pipe(v.number(), v.minValue(0)),
   scrollProgress: v.pipe(v.number(), v.minValue(0), v.maxValue(1)),
+  savedContentHeight: v.optional(v.pipe(v.number(), v.minValue(0))),
 })
 
 export const comicImageSchema = v.object({
