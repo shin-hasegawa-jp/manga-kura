@@ -757,6 +757,30 @@ describe('MangaKuraDatabase', () => {
     reopenedDatabase.close()
   })
 
+  it('保存済みの作品と単独の話から検索インデックスを生成する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const standaloneEpisode = {
+      ...fixture.episode,
+      id: 'standalone-episode-1',
+      seriesId: undefined,
+      title: '読み切り作品',
+      sourcePageUrl: 'https://example.com/oneshot',
+    }
+
+    await repository.series.save(fixture.series)
+    await repository.episodes.save(fixture.episode)
+    await repository.episodes.save(standaloneEpisode)
+
+    const index = await repository.librarySearch.buildIndex()
+
+    expect(index.get(fixture.series.id)).toBe(
+      `${fixture.series.title} ${fixture.episode.title} ${fixture.episode.sourcePageUrl}`.toLowerCase(),
+    )
+    expect(index.get(standaloneEpisode.id)).toBe('読み切り作品 https://example.com/oneshot')
+  })
+
   it('同じ元ページURLの再保存は現時点では別の話として重複登録する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)

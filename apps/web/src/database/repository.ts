@@ -7,6 +7,7 @@ import {
   validateSeries,
 } from '@/domain/models'
 import type { AppSettings, ComicImage, Episode, Series } from '@/domain/models'
+import { buildLibrarySearchIndex } from './librarySearch'
 
 export interface MangaRepository {
   series: EntityRepository<Series>
@@ -16,6 +17,11 @@ export interface MangaRepository {
   library: LibraryRepository
   topLevelLibrary: TopLevelLibraryRepository
   seriesDetails: SeriesDetailsRepository
+  librarySearch: LibrarySearchRepository
+}
+
+export interface LibrarySearchRepository {
+  buildIndex(): Promise<Map<string, string>>
 }
 
 export interface EntityRepository<T extends { id: string } = { id: string }> {
@@ -260,6 +266,19 @@ function createSeriesDetailsRepository(database: MangaKuraDatabase): SeriesDetai
   }
 }
 
+function createLibrarySearchRepository(database: MangaKuraDatabase): LibrarySearchRepository {
+  return {
+    async buildIndex() {
+      const [series, episodes] = await Promise.all([
+        database.series.toArray(),
+        database.episodes.toArray(),
+      ])
+
+      return buildLibrarySearchIndex(series, episodes)
+    },
+  }
+}
+
 export function createMangaRepository(database: MangaKuraDatabase): MangaRepository {
   return {
     series: createEntityRepository<Series>(database.series, validateSeries),
@@ -269,5 +288,6 @@ export function createMangaRepository(database: MangaKuraDatabase): MangaReposit
     library: createLibraryRepository(database),
     topLevelLibrary: createTopLevelLibraryRepository(database),
     seriesDetails: createSeriesDetailsRepository(database),
+    librarySearch: createLibrarySearchRepository(database),
   }
 }
