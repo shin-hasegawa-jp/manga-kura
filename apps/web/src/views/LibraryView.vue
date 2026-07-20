@@ -93,6 +93,13 @@ onBeforeUnmount(() => itemPresenter.dispose())
           >
             {{ item.detailLabel }}
           </p>
+          <p
+            v-if="item.readingProgress"
+            class="library-card__progress"
+            :class="{ 'library-card__progress--done': item.readingProgress.status === 'completed' }"
+          >
+            {{ item.readingProgress.label }}
+          </p>
         </component>
       </li>
     </ul>
@@ -173,6 +180,17 @@ onBeforeUnmount(() => itemPresenter.dispose())
   margin: 0;
   color: var(--app-color-text-muted);
   font-size: var(--app-font-size-sm);
+}
+
+.library-card__progress {
+  margin: 0;
+  color: var(--app-color-primary);
+  font-size: var(--app-font-size-xs);
+  font-weight: var(--app-font-weight-medium);
+}
+
+.library-card__progress--done {
+  color: var(--app-color-text-muted);
 }
 
 /* ---- 空状態 ---- */
