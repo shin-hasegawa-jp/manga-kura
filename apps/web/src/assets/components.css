@@ -64,6 +64,16 @@
   filter: brightness(0.97);
 }
 
+/* 破壊的アクション（エラー色の塗り） */
+.app-btn--danger {
+  color: var(--app-color-on-error, #fff);
+  background: var(--app-color-error);
+}
+
+.app-btn--danger:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
 /* 枠線のみ（アクセント色） */
 .app-btn--outline {
   color: var(--app-color-primary);
