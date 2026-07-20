@@ -10,7 +10,11 @@ import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
 import { getReaderRouteTarget, isReaderRouteTargetValid } from '@/router/readerRoute'
 import AppIcon from '@/components/AppIcon.vue'
 import { createReaderImagePresenter, type ReaderImageItem } from './readerImagePresenter'
-import { computeReadingPosition, shouldPersistReadingPosition } from './readingPositionTracker'
+import {
+  computeReadingPosition,
+  resolveRestoreScrollTop,
+  shouldPersistReadingPosition,
+} from './readingPositionTracker'
 import { getReaderBackRoute, getReaderViewState } from './readerViewState'
 
 const READING_POSITION_SAVE_INTERVAL_MS = 2000
@@ -73,8 +77,32 @@ async function loadReader() {
   imageItems.value = imagePresenter.present(savedImages)
   isLoading.value = false
   await nextTick()
+  if (savedEpisode) applyReadingPositionRestore(savedEpisode)
   updateReadingPosition()
-  window.setTimeout(updateReadingPosition, 0)
+  // 画像の寸法が確定してからもう一度復元し、開いた記録として最終閲覧日時を更新する
+  window.setTimeout(() => {
+    if (savedEpisode) applyReadingPositionRestore(savedEpisode)
+    updateReadingPosition()
+    persistReadingPosition(true)
+  }, 0)
+}
+
+function applyReadingPositionRestore(target: Episode) {
+  const documentElement = document.documentElement
+  const scrollTop = resolveRestoreScrollTop(
+    {
+      scrollPosition: target.scrollPosition,
+      scrollProgress: target.scrollProgress,
+      savedContentHeight: target.savedContentHeight,
+    },
+    {
+      contentHeight: documentElement.scrollHeight,
+      scrollableHeight: documentElement.scrollHeight - window.innerHeight,
+    },
+  )
+  if (scrollTop > 0) {
+    window.scrollTo(0, scrollTop)
+  }
 }
 
 function markImageFailed(imageId: string) {
