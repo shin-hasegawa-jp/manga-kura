@@ -781,6 +781,37 @@ describe('MangaKuraDatabase', () => {
     expect(index.get(standaloneEpisode.id)).toBe('読み切り作品 https://example.com/oneshot')
   })
 
+  it('保存済みデータから使用容量を集計する', async () => {
+    const database = createTestDatabase()
+    const repository = createMangaRepository(database)
+    const fixture = createDevelopmentComicFixture()
+    const secondImage = {
+      ...fixture.image,
+      id: 'development-image-2',
+      displayOrder: 1,
+      fileSize: 1024,
+      sourceUrl: 'https://example.com/development-series/episodes/1/images/2.png',
+    }
+
+    await repository.series.save(fixture.series)
+    await repository.episodes.save(fixture.episode)
+    await repository.images.save(fixture.image)
+    await repository.images.save(secondImage)
+
+    const usage = await repository.storageUsage.compute()
+
+    expect(usage.totalBytes).toBe(fixture.image.fileSize + 1024)
+    expect(usage.imageCount).toBe(2)
+    expect(usage.seriesCount).toBe(1)
+    expect(usage.episodeCount).toBe(1)
+    expect(usage.series[0]).toMatchObject({
+      seriesId: fixture.series.id,
+      episodeCount: 1,
+      imageCount: 2,
+      bytes: fixture.image.fileSize + 1024,
+    })
+  })
+
   it('同じ元ページURLの再保存は現時点では別の話として重複登録する', async () => {
     const database = createTestDatabase()
     const repository = createMangaRepository(database)

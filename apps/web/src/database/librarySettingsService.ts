@@ -1,5 +1,6 @@
 import {
   DEFAULT_LIBRARY_SORT_ORDER,
+  DEFAULT_STORAGE_WARNING_THRESHOLD_BYTES,
   LIBRARY_SORT_ORDERS,
   type AppSettings,
   type LibrarySortOrder,
@@ -15,7 +16,7 @@ export function createDefaultAppSettings(): AppSettings {
     displaySettings: { theme: 'system' },
     schemaVersion: 1,
     offlineSettings: { enabled: false },
-    storageSettings: { warningThresholdBytes: 0 },
+    storageSettings: { warningThresholdBytes: DEFAULT_STORAGE_WARNING_THRESHOLD_BYTES },
   }
 }
 
