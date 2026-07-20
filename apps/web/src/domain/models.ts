@@ -17,6 +17,9 @@ export type LibrarySortOrder = (typeof LIBRARY_SORT_ORDERS)[number]
 
 export const DEFAULT_LIBRARY_SORT_ORDER: LibrarySortOrder = 'recentlyRead'
 
+// 全データで約5GBを想定し、その約9割（4.5GiB）で容量警告を出す
+export const DEFAULT_STORAGE_WARNING_THRESHOLD_BYTES = 4_831_838_208
+
 export const seriesSchema = v.object({
   id: idSchema,
   title: titleSchema,
