@@ -8,6 +8,7 @@ import {
 } from '@/domain/models'
 import type { AppSettings, ComicImage, Episode, Series } from '@/domain/models'
 import { buildLibrarySearchIndex } from './librarySearch'
+import { computeStorageUsage, type StorageUsage } from './storageUsage'
 
 export interface MangaRepository {
   series: EntityRepository<Series>
@@ -18,10 +19,15 @@ export interface MangaRepository {
   topLevelLibrary: TopLevelLibraryRepository
   seriesDetails: SeriesDetailsRepository
   librarySearch: LibrarySearchRepository
+  storageUsage: StorageUsageRepository
 }
 
 export interface LibrarySearchRepository {
   buildIndex(): Promise<Map<string, string>>
+}
+
+export interface StorageUsageRepository {
+  compute(): Promise<StorageUsage>
 }
 
 export interface EntityRepository<T extends { id: string } = { id: string }> {
@@ -283,6 +289,20 @@ function createLibrarySearchRepository(database: MangaKuraDatabase): LibrarySear
   }
 }
 
+function createStorageUsageRepository(database: MangaKuraDatabase): StorageUsageRepository {
+  return {
+    async compute() {
+      const [series, episodes, images] = await Promise.all([
+        database.series.toArray(),
+        database.episodes.toArray(),
+        database.images.toArray(),
+      ])
+
+      return computeStorageUsage(series, episodes, images)
+    },
+  }
+}
+
 export function createMangaRepository(database: MangaKuraDatabase): MangaRepository {
   return {
     series: createEntityRepository<Series>(database.series, validateSeries),
@@ -293,5 +313,6 @@ export function createMangaRepository(database: MangaKuraDatabase): MangaReposit
     topLevelLibrary: createTopLevelLibraryRepository(database),
     seriesDetails: createSeriesDetailsRepository(database),
     librarySearch: createLibrarySearchRepository(database),
+    storageUsage: createStorageUsageRepository(database),
   }
 }
