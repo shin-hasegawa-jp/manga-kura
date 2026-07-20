@@ -9,6 +9,7 @@ import {
   mdiImageSearchOutline,
   mdiLockOutline,
   mdiShieldCheckOutline,
+  mdiWifiOff,
 } from '@mdi/js'
 import { useExistingSeriesEpisodeRegistration } from '@/composables/useExistingSeriesEpisodeRegistration'
 import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration'
@@ -21,9 +22,11 @@ import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import { createProxiedImageUrl } from '@/services/acquisitionApiClient'
 import { createSelectedImageBlobFetcher } from '@/services/imageBlobClient'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import AppIcon from '@/components/AppIcon.vue'
 import SaveStepIndicator from '@/components/SaveStepIndicator.vue'
 import { getSaveErrorPresentation, markImageFetchFailures } from './acquisitionErrorPresenter'
+import { getSaveOfflineNotice } from './offlineNotice'
 import { getImageCandidateListState } from './imageCandidateListState'
 import {
   clearAllImageCandidateSelections,
@@ -41,6 +44,9 @@ import { registrationModeOptions, type RegistrationMode } from './saveRegistrati
 
 const registrationMode = ref<RegistrationMode>('newSeries')
 const router = useRouter()
+const { isOnline } = useOnlineStatus()
+// 新規保存はページ取得の通信を要するため、オフライン時は解析を止めて理由を示す。
+const offlineNotice = computed(() => getSaveOfflineNotice(isOnline.value))
 const repository = createMangaRepository(database)
 // 重複URL警告：登録済み情報を保持している間は保存を保留する
 const duplicateWarning = ref<DuplicateRegistrationView[]>()
@@ -188,6 +194,10 @@ const {
 } = useExistingSeriesEpisodeRegistration()
 
 async function analyzePageUrl() {
+  // オフライン中はページ取得の通信ができないため解析を始めない（UIの非活性と二重で防ぐ）。
+  if (!isOnline.value) {
+    return
+  }
   if (pageImageAnalysisState.value?.status === 'analyzing') {
     return
   }
@@ -487,6 +497,11 @@ function selectRegistrationMode(mode: RegistrationMode) {
         <p class="url-step__description">
           漫画が載っているWebページのURLを貼り付けてね。ページの中から画像の候補をさがすよ。
         </p>
+        <!-- オフライン中は新規保存に必要な通信ができないことを示す -->
+        <p v-if="offlineNotice" class="save-offline" role="status">
+          <AppIcon :path="mdiWifiOff" :size="20" class="save-offline__icon" aria-hidden="true" />
+          <span>{{ offlineNotice.message }}</span>
+        </p>
         <label class="app-field-label">
           <span>ページのURL</span>
           <input
@@ -515,7 +530,11 @@ function selectRegistrationMode(mode: RegistrationMode) {
             取り込んだ画像は<strong>この端末の中だけ</strong>に保存されるよ。サーバーには残らない。
           </span>
         </p>
-        <button class="app-btn app-btn--primary app-btn--block" type="submit">
+        <button
+          class="app-btn app-btn--primary app-btn--block"
+          type="submit"
+          :disabled="!isOnline"
+        >
           ページを解析する
         </button>
       </form>
@@ -941,6 +960,25 @@ h2 {
 .save-privacy__icon {
   flex: 0 0 auto;
   margin-top: 0.125rem;
+}
+
+/* オフライン中の保存不可の案内 */
+.save-offline {
+  display: flex;
+  gap: var(--app-space-2xs);
+  align-items: flex-start;
+  margin: 0;
+  padding: var(--app-space-xs) var(--app-space-sm);
+  color: var(--app-color-text);
+  font-size: var(--app-font-size-sm);
+  background: var(--app-color-panel);
+  border-radius: var(--app-radius-md);
+}
+
+.save-offline__icon {
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+  color: var(--app-color-text-muted);
 }
 
 /* 解析中・取得失敗・候補なしの中央寄せ表示 */
