@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { mdiBookshelf, mdiMagnify, mdiPlus, mdiTrashCanOutline } from '@mdi/js'
+import { mdiBookshelf, mdiMagnify, mdiPlus, mdiTrashCanOutline, mdiWifiOff } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository, type TopLevelLibraryEntry } from '@/database/repository'
 import { createDeletionService } from '@/database/deletionService'
@@ -14,7 +14,9 @@ import AppIcon from '@/components/AppIcon.vue'
 import AppKindBadge from '@/components/AppKindBadge.vue'
 import AppThumbnail from '@/components/AppThumbnail.vue'
 import { loadLibrarySortOrder, saveLibrarySortOrder } from '@/database/librarySettingsService'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { getDeleteConfirmation } from './deleteConfirmation'
+import { getLibraryOfflineNotice } from './offlineNotice'
 import { createLibraryListItemPresenter, type LibraryListItem } from './libraryListItemPresenter'
 import { getLibraryListState } from './libraryListState'
 import { filterLibraryEntries } from './librarySearch'
@@ -43,6 +45,8 @@ const libraryItems = ref<LibraryListItem[]>([])
 const sortOrder = ref<LibrarySortOrder>(DEFAULT_LIBRARY_SORT_ORDER)
 const searchQuery = ref('')
 const searchIndex = ref<ReadonlyMap<string, string>>(new Map())
+const { isOnline } = useOnlineStatus()
+const offlineNotice = computed(() => getLibraryOfflineNotice(isOnline.value))
 const isSearching = computed(() => searchQuery.value.trim() !== '')
 const hasNoSearchResults = computed(
   () =>
@@ -114,6 +118,8 @@ onBeforeUnmount(() => itemPresenter.dispose())
   <main class="library">
     <header class="library-header">
       <h1 class="app-display">本棚</h1>
+      <!-- オフライン状態ラベル（納品デザイン17） -->
+      <span v-if="offlineNotice" class="library-header__offline">オフライン</span>
       <p v-if="libraryState.kind === 'populated'" class="library-header__count">
         全{{ libraryItems.length }}件
       </p>
@@ -131,6 +137,12 @@ onBeforeUnmount(() => itemPresenter.dispose())
         </select>
       </label>
     </header>
+
+    <!-- オフライン中の案内バナー（納品デザイン17） -->
+    <div v-if="offlineNotice" class="library-offline" role="status">
+      <AppIcon :path="mdiWifiOff" :size="22" class="library-offline__icon" aria-hidden="true" />
+      <p class="library-offline__message">{{ offlineNotice.message }}</p>
+    </div>
 
     <!-- 検索：データがある通常表示のときだけ操作可能にする -->
     <div v-if="libraryState.kind === 'populated'" class="library-search">
@@ -255,6 +267,34 @@ onBeforeUnmount(() => itemPresenter.dispose())
 .library-header__count {
   margin: 0;
   color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
+}
+
+.library-header__offline {
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
+  font-weight: var(--app-font-weight-medium);
+}
+
+/* ---- オフライン案内バナー（納品デザイン17） ---- */
+.library-offline {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-xs);
+  margin-bottom: var(--app-space-md);
+  padding: var(--app-space-sm);
+  color: var(--app-color-text);
+  background: var(--app-color-panel);
+  border-radius: var(--app-radius-md);
+}
+
+.library-offline__icon {
+  flex: 0 0 auto;
+  color: var(--app-color-text-muted);
+}
+
+.library-offline__message {
+  margin: 0;
   font-size: var(--app-font-size-sm);
 }
 

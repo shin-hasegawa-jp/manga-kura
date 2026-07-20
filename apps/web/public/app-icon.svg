@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="漫画蔵">
+  <!-- 全面ブランド色。マスカブル対応のため角丸はOS側のマスクに委ね、モチーフは中央安全域に収める。 -->
+  <rect width="512" height="512" fill="#b5643c" />
+  <!-- 本棚の棚板 -->
+  <rect x="132" y="356" width="248" height="20" rx="6" fill="#8f4a2b" />
+  <!-- 3冊の本の背表紙（生成り／パネル色）。中央80%の安全域内に配置。 -->
+  <rect x="156" y="188" width="60" height="168" rx="10" fill="#fbfaf8" />
+  <rect x="226" y="150" width="60" height="206" rx="10" fill="#f4f1ec" />
+  <rect x="296" y="176" width="60" height="180" rx="10" fill="#fbfaf8" />
+  <!-- 背表紙の帯（アクセント） -->
+  <rect x="156" y="300" width="60" height="12" fill="#b5643c" />
+  <rect x="226" y="300" width="60" height="12" fill="#b5643c" />
+  <rect x="296" y="300" width="60" height="12" fill="#b5643c" />
+</svg>

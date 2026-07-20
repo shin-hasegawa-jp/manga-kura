@@ -4,10 +4,12 @@ import { RouterView } from 'vue-router'
 import { useRoute } from 'vue-router'
 import AppNavigation from './components/AppNavigation.vue'
 import { useDeletionNotice } from './composables/useDeletionNotice'
+import { useAppUpdate } from './composables/useAppUpdate'
 
 const route = useRoute()
 const isReader = computed(() => route.meta.reader === true)
 const { message: deletionNotice } = useDeletionNotice()
+const { notice: updateNotice, applyUpdate } = useAppUpdate()
 </script>
 
 <template>
@@ -27,6 +29,20 @@ const { message: deletionNotice } = useDeletionNotice()
       <p v-if="deletionNotice" class="app-toast" role="status" aria-live="polite">
         {{ deletionNotice }}
       </p>
+    </Transition>
+
+    <!-- アプリ更新通知：新しいService Workerが待機したときだけ表示し、ユーザー操作で更新する -->
+    <Transition name="app-toast">
+      <div v-if="updateNotice" class="app-update" role="status" aria-live="polite">
+        <span class="app-update__message">{{ updateNotice.message }}</span>
+        <button
+          type="button"
+          class="app-btn app-btn--primary app-update__action"
+          @click="applyUpdate"
+        >
+          {{ updateNotice.actionLabel }}
+        </button>
+      </div>
     </Transition>
   </v-app>
 </template>
@@ -65,6 +81,35 @@ const { message: deletionNotice } = useDeletionNotice()
   text-align: center;
   background: var(--app-color-cta);
   border-radius: var(--app-radius-md);
+}
+
+/* ---- アプリ更新通知 ---- */
+.app-update {
+  position: fixed;
+  z-index: 200;
+  right: var(--app-space-sm);
+  bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  left: var(--app-space-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-xs);
+  max-width: var(--app-content-max-width);
+  margin: 0 auto;
+  padding: var(--app-space-xs) var(--app-space-sm);
+  color: var(--app-color-on-cta);
+  font-size: var(--app-font-size-sm);
+  background: var(--app-color-cta);
+  border-radius: var(--app-radius-md);
+}
+
+.app-update__message {
+  flex: 1 1 auto;
+}
+
+.app-update__action {
+  flex: 0 0 auto;
 }
 
 .app-toast-enter-active,
