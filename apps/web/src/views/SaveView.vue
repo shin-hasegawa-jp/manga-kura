@@ -13,6 +13,9 @@ import {
 import { useExistingSeriesEpisodeRegistration } from '@/composables/useExistingSeriesEpisodeRegistration'
 import { useNewSeriesRegistration } from '@/composables/useNewSeriesRegistration'
 import { useStandaloneEpisodeRegistration } from '@/composables/useStandaloneEpisodeRegistration'
+import { database } from '@/database/database'
+import { createMangaRepository } from '@/database/repository'
+import { findDuplicateRegistrations } from '@/database/duplicateUrl'
 import type { RegistrationImage } from '@/database/registrationService'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import { createProxiedImageUrl } from '@/services/acquisitionApiClient'
@@ -33,10 +36,14 @@ import {
   validateAnalyzedPageSave,
   type AnalyzedPageRegistrationDetails,
 } from './saveAnalyzedPage'
+import { toDuplicateRegistrationViews, type DuplicateRegistrationView } from './duplicateUrlWarning'
 import { registrationModeOptions, type RegistrationMode } from './saveRegistrationMode'
 
 const registrationMode = ref<RegistrationMode>('newSeries')
 const router = useRouter()
+const repository = createMangaRepository(database)
+// 重複URL警告：登録済み情報を保持している間は保存を保留する
+const duplicateWarning = ref<DuplicateRegistrationView[]>()
 const pageUrl = ref('')
 const pageImageAnalysisState = ref<PageImageAnalysisState>()
 const isSavingAnalyzedPage = ref(false)
@@ -261,7 +268,7 @@ function registerMode(mode: RegistrationMode, images: readonly RegistrationImage
   }
 }
 
-async function saveCurrentRegistration() {
+async function saveCurrentRegistration(options: { force?: boolean } = {}) {
   if (isSavingAnalyzedPage.value) {
     return
   }
@@ -275,6 +282,15 @@ async function saveCurrentRegistration() {
     saveFlowError.value =
       validation.status === 'error' ? validation.message : '登録情報を確認してください。'
     return
+  }
+
+  // 明示的に重複保存を選んでいない場合は、同一URLの既存話を警告する
+  if (!options.force) {
+    const duplicates = await findDuplicateRegistrations(repository, details.sourcePageUrl.trim())
+    if (duplicates.length > 0) {
+      duplicateWarning.value = toDuplicateRegistrationViews(duplicates)
+      return
+    }
   }
 
   const completion = {
@@ -326,6 +342,16 @@ async function saveCurrentRegistration() {
   } finally {
     isSavingAnalyzedPage.value = false
   }
+}
+
+function cancelDuplicateSave() {
+  // 入力・選択状態を保持したまま情報入力へ戻る
+  duplicateWarning.value = undefined
+}
+
+function confirmDuplicateSave() {
+  duplicateWarning.value = undefined
+  void saveCurrentRegistration({ force: true })
 }
 
 function continueSaving() {
@@ -674,7 +700,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
           v-if="registrationMode === 'newSeries'"
           class="registration-fields"
           aria-label="新規作品の入力項目"
-          @submit.prevent="saveCurrentRegistration"
+          @submit.prevent="saveCurrentRegistration()"
         >
           <label class="app-field-label">
             <span>作品名</span>
@@ -719,7 +745,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
           v-else-if="registrationMode === 'standaloneEpisode'"
           class="registration-fields"
           aria-label="単独の話の入力項目"
-          @submit.prevent="saveCurrentRegistration"
+          @submit.prevent="saveCurrentRegistration()"
         >
           <label class="app-field-label">
             <span>話タイトル</span>
@@ -754,7 +780,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
           v-else
           class="registration-fields"
           aria-label="既存作品への話追加の入力項目"
-          @submit.prevent="saveCurrentRegistration"
+          @submit.prevent="saveCurrentRegistration()"
         >
           <label class="app-field-label">
             <span>追加先作品</span>
@@ -813,6 +839,49 @@ function selectRegistrationMode(mode: RegistrationMode) {
         </p>
       </section>
     </template>
+
+    <!-- URL重複警告（納品デザイン12） -->
+    <div
+      v-if="duplicateWarning"
+      class="duplicate-warning"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="duplicate-warning-title"
+    >
+      <div class="duplicate-warning__panel">
+        <div class="duplicate-warning__icon" aria-hidden="true">
+          <AppIcon :path="mdiAlertOutline" :size="32" />
+        </div>
+        <h2 id="duplicate-warning-title" class="app-heading duplicate-warning__title">
+          このURLは既に登録されています
+        </h2>
+        <p class="duplicate-warning__message">
+          同じ元ページのURLがすでに保存されているよ。内容が更新されている場合や別の画像を選びたい場合は、重複して保存できるよ。
+        </p>
+        <ul class="duplicate-warning__list">
+          <li v-for="registration in duplicateWarning" :key="registration.episodeId">
+            <strong>{{ registration.title }}</strong>
+            <span>登録日時：{{ registration.registeredAtLabel }}</span>
+          </li>
+        </ul>
+        <div class="duplicate-warning__actions">
+          <button
+            class="app-btn app-btn--secondary app-btn--block"
+            type="button"
+            @click="cancelDuplicateSave"
+          >
+            キャンセル
+          </button>
+          <button
+            class="app-btn app-btn--primary app-btn--block"
+            type="button"
+            @click="confirmDuplicateSave"
+          >
+            重複して保存
+          </button>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -1275,5 +1344,78 @@ h2 {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---- URL重複警告 ---- */
+.duplicate-warning {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--app-space-md);
+  background: rgba(0, 0, 0, 45%);
+}
+
+.duplicate-warning__panel {
+  display: grid;
+  justify-items: center;
+  gap: var(--app-space-xs);
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--app-space-lg) var(--app-space-md);
+  text-align: center;
+  background: var(--app-color-surface);
+  border-radius: var(--app-radius-lg);
+}
+
+.duplicate-warning__icon {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  color: var(--app-color-error);
+  background: var(--app-color-panel);
+  border-radius: var(--app-radius-pill);
+}
+
+.duplicate-warning__title {
+  margin: 0;
+  font-size: var(--app-font-size-lg);
+}
+
+.duplicate-warning__message {
+  margin: 0;
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
+}
+
+.duplicate-warning__list {
+  display: grid;
+  gap: var(--app-space-2xs);
+  width: 100%;
+  padding: var(--app-space-xs);
+  margin: 0;
+  text-align: left;
+  list-style: none;
+  background: var(--app-color-panel);
+  border-radius: var(--app-radius-md);
+}
+
+.duplicate-warning__list li {
+  display: grid;
+  gap: var(--app-space-3xs);
+}
+
+.duplicate-warning__list span {
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
+}
+
+.duplicate-warning__actions {
+  display: grid;
+  gap: var(--app-space-2xs);
+  width: 100%;
+  margin-top: var(--app-space-2xs);
 }
 </style>
