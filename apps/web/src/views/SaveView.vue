@@ -530,11 +530,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
             取り込んだ画像は<strong>この端末の中だけ</strong>に保存されるよ。サーバーには残らない。
           </span>
         </p>
-        <button
-          class="app-btn app-btn--primary app-btn--block"
-          type="submit"
-          :disabled="!isOnline"
-        >
+        <button class="app-btn app-btn--primary app-btn--block" type="submit" :disabled="!isOnline">
           ページを解析する
         </button>
       </form>

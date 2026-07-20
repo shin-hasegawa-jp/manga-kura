@@ -35,7 +35,11 @@ const { notice: updateNotice, applyUpdate } = useAppUpdate()
     <Transition name="app-toast">
       <div v-if="updateNotice" class="app-update" role="status" aria-live="polite">
         <span class="app-update__message">{{ updateNotice.message }}</span>
-        <button type="button" class="app-btn app-btn--primary app-update__action" @click="applyUpdate">
+        <button
+          type="button"
+          class="app-btn app-btn--primary app-update__action"
+          @click="applyUpdate"
+        >
           {{ updateNotice.actionLabel }}
         </button>
       </div>
