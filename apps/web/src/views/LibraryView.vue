@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { mdiBookshelf, mdiMagnify, mdiPlus } from '@mdi/js'
+import { mdiBookshelf, mdiMagnify, mdiPlus, mdiTrashCanOutline } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository, type TopLevelLibraryEntry } from '@/database/repository'
+import { createDeletionService } from '@/database/deletionService'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
 import { getStandaloneEpisodeReaderRoute } from '@/router/readerRoute'
+import { useDeleteConfirm } from '@/composables/useDeleteConfirm'
+import { useDeletionNotice } from '@/composables/useDeletionNotice'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppKindBadge from '@/components/AppKindBadge.vue'
 import AppThumbnail from '@/components/AppThumbnail.vue'
 import { loadLibrarySortOrder, saveLibrarySortOrder } from '@/database/librarySettingsService'
+import { getDeleteConfirmation } from './deleteConfirmation'
 import { createLibraryListItemPresenter, type LibraryListItem } from './libraryListItemPresenter'
 import { getLibraryListState } from './libraryListState'
 import { filterLibraryEntries } from './librarySearch'
@@ -22,6 +27,15 @@ import {
 } from './librarySort'
 
 const repository = createMangaRepository(database)
+const deletionService = createDeletionService(database)
+const { notify } = useDeletionNotice()
+const {
+  target: deleteTarget,
+  isDeleting,
+  request: requestDelete,
+  cancel: cancelDelete,
+  confirm: confirmDelete,
+} = useDeleteConfirm()
 const itemPresenter = createLibraryListItemPresenter(createObjectUrlRegistry())
 const entries = ref<TopLevelLibraryEntry[]>()
 const libraryState = computed(() => getLibraryListState(entries.value))
@@ -62,6 +76,22 @@ function onSearchInput(event: Event) {
 function clearSearch() {
   searchQuery.value = ''
   renderItems()
+}
+
+function askDeleteItem(item: LibraryListItem) {
+  if (item.kind === 'series') {
+    requestDelete({ kind: 'series', title: item.title }, async () => {
+      await deletionService.deleteSeries(item.itemId)
+      notify('作品を削除しました')
+      await loadLibrary()
+    })
+    return
+  }
+  requestDelete({ kind: 'episode', title: item.title }, async () => {
+    await deletionService.deleteEpisode(item.itemId)
+    notify('話を削除しました')
+    await loadLibrary()
+  })
 }
 
 async function changeSortOrder(order: LibrarySortOrder) {
@@ -158,7 +188,15 @@ onBeforeUnmount(() => itemPresenter.dispose())
 
     <!-- 通常：作品・単独の話を同じグリッドに混在 -->
     <ul v-else class="library-grid">
-      <li v-for="item in libraryItems" :key="item.itemId">
+      <li v-for="item in libraryItems" :key="item.itemId" class="library-cell">
+        <button
+          class="library-card__delete"
+          type="button"
+          :aria-label="`${item.title}を削除`"
+          @click="askDeleteItem(item)"
+        >
+          <AppIcon :path="mdiTrashCanOutline" :size="18" />
+        </button>
         <component
           :is="RouterLink"
           class="library-card library-card--link"
@@ -194,6 +232,14 @@ onBeforeUnmount(() => itemPresenter.dispose())
         </component>
       </li>
     </ul>
+
+    <AppConfirmDialog
+      v-if="deleteTarget"
+      v-bind="getDeleteConfirmation(deleteTarget)"
+      :busy="isDeleting"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
   </main>
 </template>
 
@@ -247,6 +293,31 @@ onBeforeUnmount(() => itemPresenter.dispose())
   padding: 0;
   margin: 0;
   list-style: none;
+}
+
+.library-cell {
+  position: relative;
+}
+
+.library-card__delete {
+  position: absolute;
+  top: var(--app-space-2xs);
+  right: var(--app-space-2xs);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--app-color-on-cta);
+  background: rgba(0, 0, 0, 55%);
+  border: 0;
+  border-radius: var(--app-radius-pill);
+  cursor: pointer;
+}
+
+.library-card__delete:focus-visible {
+  outline: 0.1875rem solid var(--app-color-surface);
+  outline-offset: 0.125rem;
 }
 
 .library-card {

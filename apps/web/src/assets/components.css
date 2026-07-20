@@ -81,6 +81,13 @@
   border-color: var(--app-color-primary);
 }
 
+/* 枠線のみ（破壊的アクション） */
+.app-btn--danger-outline {
+  color: var(--app-color-error);
+  background: transparent;
+  border-color: var(--app-color-error);
+}
+
 /* テキストリンク調 */
 .app-btn--text {
   min-height: 2.75rem;

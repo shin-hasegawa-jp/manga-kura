@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
-import { mdiAlertCircleOutline, mdiChevronLeft, mdiTextBoxOutline } from '@mdi/js'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import {
+  mdiAlertCircleOutline,
+  mdiChevronLeft,
+  mdiTextBoxOutline,
+  mdiTrashCanOutline,
+} from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository, type SeriesDetails } from '@/database/repository'
+import { createDeletionService } from '@/database/deletionService'
 import { createObjectUrlRegistry } from '@/utils/objectUrlRegistry'
 import { getSeriesEpisodeReaderRoute } from '@/router/readerRoute'
+import { useDeleteConfirm } from '@/composables/useDeleteConfirm'
+import { useDeletionNotice } from '@/composables/useDeletionNotice'
+import AppConfirmDialog from '@/components/AppConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppThumbnail from '@/components/AppThumbnail.vue'
+import { getDeleteConfirmation } from './deleteConfirmation'
 import { getSeriesDetailState } from './seriesDetailState'
 import {
   createSeriesEpisodeListItemPresenter,
@@ -15,7 +25,17 @@ import {
 } from './seriesEpisodeListItemPresenter'
 
 const route = useRoute()
+const router = useRouter()
 const repository = createMangaRepository(database)
+const deletionService = createDeletionService(database)
+const { notify } = useDeletionNotice()
+const {
+  target: deleteTarget,
+  isDeleting,
+  request: requestDelete,
+  cancel: cancelDelete,
+  confirm: confirmDelete,
+} = useDeleteConfirm()
 const itemPresenter = createSeriesEpisodeListItemPresenter(createObjectUrlRegistry())
 const isLoading = ref(true)
 const details = ref<SeriesDetails>()
@@ -41,6 +61,25 @@ async function loadSeriesDetails() {
   details.value = savedDetails
   episodeItems.value = itemPresenter.present(savedDetails?.episodes ?? [])
   isLoading.value = false
+}
+
+function askDeleteSeries() {
+  const current = details.value
+  if (current === undefined) return
+
+  requestDelete({ kind: 'series', title: current.series.title }, async () => {
+    await deletionService.deleteSeries(current.series.id)
+    notify('作品を削除しました')
+    await router.push({ name: 'library' })
+  })
+}
+
+function askDeleteEpisode(item: SeriesEpisodeListItem) {
+  requestDelete({ kind: 'episode', title: item.title }, async () => {
+    await deletionService.deleteEpisode(item.episodeId)
+    notify('話を削除しました')
+    await loadSeriesDetails()
+  })
 }
 
 onMounted(loadSeriesDetails)
@@ -83,6 +122,14 @@ onBeforeUnmount(() => itemPresenter.dispose())
         <div class="series-header__meta">
           <h1 class="app-heading series-header__title">{{ details.series.title }}</h1>
           <p class="series-header__count">全{{ details.episodes.length }}話</p>
+          <button
+            class="app-btn app-btn--danger-outline series-header__delete"
+            type="button"
+            @click="askDeleteSeries"
+          >
+            <AppIcon :path="mdiTrashCanOutline" :size="18" />
+            作品を削除
+          </button>
         </div>
       </header>
 
@@ -98,7 +145,7 @@ onBeforeUnmount(() => itemPresenter.dispose())
       </div>
 
       <ul v-else class="episode-list">
-        <li v-for="item in episodeItems" :key="item.episodeId">
+        <li v-for="item in episodeItems" :key="item.episodeId" class="episode-row">
           <RouterLink
             class="episode-item"
             :to="getSeriesEpisodeReaderRoute(details.series.id, item.episodeId)"
@@ -124,9 +171,25 @@ onBeforeUnmount(() => itemPresenter.dispose())
               </p>
             </div>
           </RouterLink>
+          <button
+            class="episode-row__delete"
+            type="button"
+            :aria-label="`${item.title}を削除`"
+            @click="askDeleteEpisode(item)"
+          >
+            <AppIcon :path="mdiTrashCanOutline" :size="20" />
+          </button>
         </li>
       </ul>
     </template>
+
+    <AppConfirmDialog
+      v-if="deleteTarget"
+      v-bind="getDeleteConfirmation(deleteTarget)"
+      :busy="isDeleting"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
   </main>
 </template>
 
@@ -166,6 +229,15 @@ onBeforeUnmount(() => itemPresenter.dispose())
   font-size: var(--app-font-size-sm);
 }
 
+.series-header__delete {
+  gap: var(--app-space-3xs);
+  width: auto;
+  min-height: 2.5rem;
+  margin-top: var(--app-space-2xs);
+  padding: 0 var(--app-space-sm);
+  font-size: var(--app-font-size-sm);
+}
+
 .series-detail__section-title {
   margin: 0 0 var(--app-space-xs);
   font-size: var(--app-font-size-lg);
@@ -180,14 +252,40 @@ onBeforeUnmount(() => itemPresenter.dispose())
   list-style: none;
 }
 
+.episode-row {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2xs);
+  border-bottom: 1px solid var(--app-color-border);
+}
+
 .episode-item {
   display: flex;
+  flex: 1;
   gap: var(--app-space-sm);
   align-items: center;
+  min-width: 0;
   padding: var(--app-space-xs) 0;
   color: inherit;
   text-decoration: none;
-  border-bottom: 1px solid var(--app-color-border);
+}
+
+.episode-row__delete {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--app-color-error);
+  background: transparent;
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+}
+
+.episode-row__delete:focus-visible {
+  outline: 0.1875rem solid var(--app-color-error);
+  outline-offset: 0.125rem;
 }
 
 .episode-item__thumb {
