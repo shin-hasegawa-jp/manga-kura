@@ -34,6 +34,33 @@ describe('作品内の話カード表示', () => {
     expect(objectUrls.create).toHaveBeenCalledWith(fixture.image.blob)
   })
 
+  it('閲覧途中の話には続きから読む進捗を付与し、未閲覧の話には付与しない', () => {
+    const fixture = createDevelopmentComicFixture()
+    const inProgressEpisode = {
+      ...fixture.episode,
+      id: 'in-progress-episode',
+      scrollProgress: 0.4,
+      lastReadAt: new Date('2026-07-20T05:00:00.000Z'),
+    }
+    const objectUrls = {
+      create: vi.fn().mockReturnValue('blob:episode-thumbnail'),
+      revokeAll: vi.fn(),
+    }
+    const presenter = createSeriesEpisodeListItemPresenter(objectUrls)
+
+    const [inProgress, unread] = presenter.present([
+      { episode: inProgressEpisode },
+      { episode: fixture.episode },
+    ])
+
+    expect(inProgress?.readingProgress).toEqual({
+      status: 'inProgress',
+      percent: 40,
+      label: '続きから 40%',
+    })
+    expect(unread).not.toHaveProperty('readingProgress')
+  })
+
   it('一覧の再生成時と破棄時にObject URLを解放する', () => {
     const fixture = createDevelopmentComicFixture()
     const objectUrls = {

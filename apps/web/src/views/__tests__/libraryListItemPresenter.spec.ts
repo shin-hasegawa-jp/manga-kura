@@ -50,6 +50,31 @@ describe('ライブラリ一覧項目のサムネイル表示', () => {
     ])
   })
 
+  it('閲覧途中の単独の話には続きから読む進捗を付与する', () => {
+    const fixture = createDevelopmentComicFixture()
+    const inProgressEpisode = {
+      ...fixture.episode,
+      id: 'standalone-in-progress',
+      seriesId: undefined,
+      title: '閲覧途中の単独の話',
+      scrollProgress: 0.6,
+      lastReadAt: new Date('2026-07-20T05:00:00.000Z'),
+    }
+    const objectUrls = {
+      create: vi.fn().mockReturnValue('blob:thumbnail'),
+      revokeAll: vi.fn(),
+    }
+    const presenter = createLibraryListItemPresenter(objectUrls)
+
+    const [item] = presenter.present([{ kind: 'standaloneEpisode', episode: inProgressEpisode }])
+
+    expect(item?.readingProgress).toEqual({
+      status: 'inProgress',
+      percent: 60,
+      label: '続きから 60%',
+    })
+  })
+
   it('一覧の再生成時と破棄時に既存のObject URLを解放する', () => {
     const fixture = createDevelopmentComicFixture()
     const objectUrls = {

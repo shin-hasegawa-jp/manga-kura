@@ -106,12 +106,23 @@ onBeforeUnmount(() => itemPresenter.dispose())
             <div class="episode-item__thumb">
               <AppThumbnail :src="item.thumbnailUrl" :label="item.title" />
             </div>
-            <h3 class="episode-item__title">
-              <span v-if="item.episodeNumberLabel" class="episode-item__number">
-                {{ item.episodeNumberLabel }}
-              </span>
-              {{ item.title }}
-            </h3>
+            <div class="episode-item__body">
+              <h3 class="episode-item__title">
+                <span v-if="item.episodeNumberLabel" class="episode-item__number">
+                  {{ item.episodeNumberLabel }}
+                </span>
+                {{ item.title }}
+              </h3>
+              <p
+                v-if="item.readingProgress"
+                class="episode-item__progress"
+                :class="{
+                  'episode-item__progress--done': item.readingProgress.status === 'completed',
+                }"
+              >
+                {{ item.readingProgress.label }}
+              </p>
+            </div>
           </RouterLink>
         </li>
       </ul>
@@ -184,6 +195,12 @@ onBeforeUnmount(() => itemPresenter.dispose())
   width: 3.5rem;
 }
 
+.episode-item__body {
+  display: grid;
+  gap: var(--app-space-3xs);
+  min-width: 0;
+}
+
 .episode-item__title {
   margin: 0;
   font-size: var(--app-font-size-md);
@@ -192,6 +209,17 @@ onBeforeUnmount(() => itemPresenter.dispose())
 
 .episode-item__number {
   margin-right: var(--app-space-3xs);
+}
+
+.episode-item__progress {
+  margin: 0;
+  color: var(--app-color-primary);
+  font-size: var(--app-font-size-xs);
+  font-weight: var(--app-font-weight-medium);
+}
+
+.episode-item__progress--done {
+  color: var(--app-color-text-muted);
 }
 
 /* ---- 空状態・Not Found ---- */

@@ -1,11 +1,13 @@
 import type { SeriesEpisodeEntry } from '@/database/repository'
 import type { ObjectUrlRegistry } from '@/utils/objectUrlRegistry'
+import { getReadingProgressText, type ReadingProgressText } from './readingProgress'
 
 export interface SeriesEpisodeListItem {
   episodeId: string
   title: string
   episodeNumberLabel?: string
   thumbnailUrl?: string
+  readingProgress?: ReadingProgressText
 }
 
 export interface SeriesEpisodeListItemPresenter {
@@ -20,14 +22,19 @@ export function createSeriesEpisodeListItemPresenter(
     present(entries) {
       objectUrls.revokeAll()
 
-      return entries.map(({ episode, thumbnailImage }) => ({
-        episodeId: episode.id,
-        title: episode.title,
-        ...(episode.episodeNumber !== undefined
-          ? { episodeNumberLabel: `第${episode.episodeNumber}話` }
-          : {}),
-        ...(thumbnailImage ? { thumbnailUrl: objectUrls.create(thumbnailImage.blob) } : {}),
-      }))
+      return entries.map(({ episode, thumbnailImage }) => {
+        const readingProgress = getReadingProgressText(episode)
+
+        return {
+          episodeId: episode.id,
+          title: episode.title,
+          ...(episode.episodeNumber !== undefined
+            ? { episodeNumberLabel: `第${episode.episodeNumber}話` }
+            : {}),
+          ...(thumbnailImage ? { thumbnailUrl: objectUrls.create(thumbnailImage.blob) } : {}),
+          ...(readingProgress.status !== 'unread' ? { readingProgress } : {}),
+        }
+      })
     },
     dispose() {
       objectUrls.revokeAll()
