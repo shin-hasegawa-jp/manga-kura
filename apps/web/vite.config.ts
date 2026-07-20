@@ -34,6 +34,28 @@ export default defineConfig({
           { src: 'app-icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
         ],
       },
+      workbox: {
+        // アプリ本体の静的資産のみプリキャッシュする。同梱フォント（woff2, 約17MB/620ファイル）は
+        // 初回インストールを軽く保つためプリキャッシュに含めず、下記のランタイムキャッシュで
+        // 使用時に取り込む。未取得時はデザイン方針どおりシステムフォントへフォールバックする。
+        globPatterns: ['**/*.{js,css,html,svg,ico}'],
+        // SPAのため、未キャッシュの画面遷移はアプリシェル（index.html）へフォールバックする。
+        navigateFallback: '/index.html',
+        runtimeCaching: [
+          {
+            // 同梱フォントは使用時にキャッシュし、次回以降はオフラインでも表示できるようにする。
+            urlPattern: ({ request }) => request.destination === 'font',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'app-fonts',
+              expiration: { maxEntries: 700, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
+        // 取得APIや対象サイトへの通信はキャッシュ対象にしない（オンライン必須方針を維持）。
+        // クロスオリジンのfetchはService Workerを素通りしてネットワークへ向かう。
+      },
       devOptions: {
         // 開発サーバーではService Workerを無効化し、既存のdev体験を変えない。
         enabled: false,
