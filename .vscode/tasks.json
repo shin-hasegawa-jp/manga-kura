@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docker Compose: 初期セットアップ",
+      "type": "shell",
+      "command": "docker compose -f compose.dev.yaml build && docker compose -f compose.dev.yaml run --rm --no-deps api uv sync --locked --no-install-project && docker compose -f compose.dev.yaml run --rm --no-deps web npm ci && docker compose -f compose.dev.yaml up -d",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: 削除（volumeを除く）",
+      "type": "shell",
+      "command": "docker compose -f compose.dev.yaml down",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker Compose: 削除（volumeを含む）",
+      "type": "shell",
+      "command": "docker compose -f compose.dev.yaml down --volumes",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
