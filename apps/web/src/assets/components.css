@@ -73,7 +73,7 @@
 
 /* テキストリンク調 */
 .app-btn--text {
-  min-height: auto;
+  min-height: 2.75rem;
   padding: var(--app-space-3xs) var(--app-space-2xs);
   color: var(--app-color-primary);
   background: transparent;

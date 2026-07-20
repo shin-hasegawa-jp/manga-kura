@@ -253,10 +253,15 @@ onBeforeUnmount(() => {
   display: inline-flex;
   gap: var(--app-space-3xs);
   align-items: center;
+  min-height: 2.75rem;
   padding: var(--app-space-2xs);
   color: #d9b48a;
   background: none;
   border: 0;
+}
+.reader-page__failure button:focus-visible {
+  outline: 0.1875rem solid currentColor;
+  outline-offset: 0.125rem;
 }
 .reader-progress {
   position: fixed;

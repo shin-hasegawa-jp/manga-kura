@@ -19,6 +19,9 @@ import { RouterLink } from 'vue-router'
 }
 
 .settings__storage-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
   width: fit-content;
   color: var(--app-color-text);
   font-weight: 700;
@@ -27,7 +30,7 @@ import { RouterLink } from 'vue-router'
 
 .settings__storage-link:focus-visible {
   border-radius: var(--app-radius-sm);
-  outline: 3px solid var(--app-color-focus);
+  outline: 0.1875rem solid var(--app-color-primary);
   outline-offset: 0.25rem;
 }
 </style>
