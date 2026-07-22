@@ -99,9 +99,10 @@ describe('ページ画像解析フロー', () => {
 
   it('URL検証失敗時は解析APIを呼び出さない', async () => {
     const dependencies = createDependencies({
-      validateUrl: vi.fn(
-        (): PageUrlValidation => ({ status: 'invalid', message: 'URLが不正です。' }),
-      ),
+      validateUrl: vi.fn((): PageUrlValidation => ({
+        status: 'invalid',
+        message: 'URLが不正です。',
+      })),
     })
 
     await expect(analyzePageImages('invalid', dependencies)).resolves.toEqual({

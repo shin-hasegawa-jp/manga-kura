@@ -1,10 +1,8 @@
 export type PageUrlValidation =
-  | { status: 'valid'; url: string }
-  | { status: 'invalid'; message: string }
+  { status: 'valid'; url: string } | { status: 'invalid'; message: string }
 
 export type PageUrlSubmission =
-  | { status: 'success'; message: string; url: string }
-  | { status: 'error'; message: string }
+  { status: 'success'; message: string; url: string } | { status: 'error'; message: string }
 
 export function validatePageUrl(input: string): PageUrlValidation {
   const trimmedInput = input.trim()
