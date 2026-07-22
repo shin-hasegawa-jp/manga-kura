@@ -1,0 +1,24 @@
+# Semgrepのスキャン対象から除外するパス
+# 依存パッケージ
+node_modules/
+apps/web/node_modules/
+.venv/
+apps/api/.venv/
+
+# ビルド成果物・キャッシュ
+dist/
+build/
+apps/web/dist/
+coverage/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# 生成物・ミニファイ済みアセット
+*.min.js
+*.min.css
+
+# ロックファイル
+package-lock.json
+apps/web/package-lock.json
+apps/api/uv.lock
