@@ -40,3 +40,20 @@ jobs:
         working-directory: apps/web
         run: |
           npm audit --package-lock-only --json > "$GITHUB_WORKSPACE/npm-audit.json" || true
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@v8.3.2
+        with:
+          version: "0.11.28"
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+
+      - name: Audit API dependencies (pip-audit)
+        id: pip-audit
+        continue-on-error: true
+        working-directory: apps/api
+        run: |
+          uv export --frozen --format requirements-txt --no-emit-project -o requirements.txt
+          uvx pip-audit -r requirements.txt --format json --output "$GITHUB_WORKSPACE/pip-audit.json" || true
+          rm -f requirements.txt
