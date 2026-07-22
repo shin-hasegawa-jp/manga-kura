@@ -93,6 +93,11 @@ const urlStepView = computed<'form' | 'analyzing' | 'fetchFailed' | 'noCandidate
       return 'noCandidates'
     case 'success':
       return 'form'
+    default: {
+      // 網羅性チェック：statusにcaseが追加された場合に型エラーで検知する
+      const exhaustiveCheck: never = state
+      return exhaustiveCheck
+    }
   }
 })
 const urlValidationMessage = computed(() => {
@@ -133,6 +138,11 @@ const registrationFieldsComplete = computed(() => {
         existingSeriesEpisodeTitle.value.trim() !== '' &&
         existingSeriesEpisodeSourcePageUrl.value.trim() !== ''
       )
+    default: {
+      // 網羅性チェック：RegistrationModeにcaseが追加された場合に型エラーで検知する
+      const exhaustiveCheck: never = registrationMode.value
+      return exhaustiveCheck
+    }
   }
 })
 
