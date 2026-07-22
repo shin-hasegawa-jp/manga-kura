@@ -57,3 +57,93 @@ jobs:
           uv export --frozen --format requirements-txt --no-emit-project -o requirements.txt
           uvx pip-audit -r requirements.txt --format json --output "$GITHUB_WORKSPACE/pip-audit.json" || true
           rm -f requirements.txt
+
+      - name: Comment audit results on pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          pr = os.environ["PR_NUMBER"]
+          marker = "<!-- dependency-audit-report -->"
+          def req(method, url, data=None):
+              body = json.dumps(data).encode() if data is not None else None
+              r = urllib.request.Request(url, data=body, method=method)
+              r.add_header("Authorization", "Bearer " + token)
+              r.add_header("Accept", "application/vnd.github+json")
+              r.add_header("X-GitHub-Api-Version", "2022-11-28")
+              if body is not None:
+                  r.add_header("Content-Type", "application/json")
+              with urllib.request.urlopen(r) as resp:
+                  return json.loads(resp.read() or "null")
+          def load(path):
+              try:
+                  with open(path, encoding="utf-8") as f:
+                      return json.load(f)
+              except (FileNotFoundError, json.JSONDecodeError):
+                  return None
+          def esc(s):
+              return str(s).replace("|", "\\|").replace("\n", " ").strip()
+          npm = load("npm-audit.json")
+          npm_lines = []
+          if npm is None:
+              npm_lines.append("⚠️ npm auditの結果を取得できませんでした。")
+          else:
+              meta = npm.get("metadata", {}).get("vulnerabilities", {})
+              total = meta.get("total", 0)
+              if not total:
+                  npm_lines.append("✅ 検出はありませんでした。")
+              else:
+                  order = ["critical", "high", "moderate", "low", "info"]
+                  brk = " / ".join(k + ": " + str(meta.get(k, 0)) for k in order if meta.get(k, 0))
+                  npm_lines.append("検出 **" + str(total) + "件** — " + brk)
+                  npm_lines.append("")
+                  npm_lines.append("| パッケージ | 重大度 | 内容 |")
+                  npm_lines.append("| --- | --- | --- |")
+                  rank = {"critical": 0, "high": 1, "moderate": 2, "low": 3, "info": 4}
+                  items = sorted(npm.get("vulnerabilities", {}).values(), key=lambda v: rank.get(v.get("severity"), 9))
+                  for v in items[:50]:
+                      titles = [x["title"] for x in v.get("via", []) if isinstance(x, dict) and x.get("title")]
+                      title = esc("; ".join(titles)) if titles else "-"
+                      if len(title) > 160:
+                          title = title[:157] + "..."
+                      npm_lines.append("| `" + esc(v.get("name", "")) + "` | " + esc(v.get("severity", "")) + " | " + title + " |")
+          pip = load("pip-audit.json")
+          pip_lines = []
+          if pip is None:
+              pip_lines.append("⚠️ pip-auditの結果を取得できませんでした。")
+          else:
+              deps = pip.get("dependencies", []) if isinstance(pip, dict) else (pip if isinstance(pip, list) else [])
+              vuln_deps = [d for d in deps if d.get("vulns")]
+              if not vuln_deps:
+                  pip_lines.append("✅ 検出はありませんでした。")
+              else:
+                  cnt = sum(len(d.get("vulns", [])) for d in vuln_deps)
+                  pip_lines.append("検出 **" + str(cnt) + "件**（" + str(len(vuln_deps)) + "パッケージ）")
+                  pip_lines.append("")
+                  pip_lines.append("| パッケージ | バージョン | 脆弱性ID | 修正版 |")
+                  pip_lines.append("| --- | --- | --- | --- |")
+                  rows = 0
+                  for d in vuln_deps:
+                      for vln in d.get("vulns", []):
+                          if rows >= 50:
+                              break
+                          fix = ", ".join(vln.get("fix_versions", []) or []) or "-"
+                          pip_lines.append("| `" + esc(d.get("name", "")) + "` | " + esc(d.get("version", "")) + " | " + esc(vln.get("id", "")) + " | " + esc(fix) + " |")
+                          rows += 1
+          lines = [marker, "## 依存脆弱性監査レポート", "", "> この検出はCIを失敗させません（警告としての通知です）。", "", "### Frontend（npm audit）"] + npm_lines + ["", "### API（pip-audit）"] + pip_lines
+          body = "\n".join(lines)
+          comments = req("GET", api + "/repos/" + repo + "/issues/" + pr + "/comments?per_page=100")
+          existing = next((c for c in comments if marker in (c.get("body") or "")), None)
+          if existing:
+              req("PATCH", api + "/repos/" + repo + "/issues/comments/" + str(existing["id"]), {"body": body})
+          else:
+              req("POST", api + "/repos/" + repo + "/issues/" + pr + "/comments", {"body": body})
+          print("Dependency audit PR comment upserted.")
+          PY
