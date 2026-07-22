@@ -2,8 +2,7 @@ import type { ComicRegistrationService, RegistrationImage } from '@/database/reg
 import type { AddEpisodeToSeriesRegistration } from '@/domain/registration'
 
 export type ExistingSeriesEpisodeRegistrationSubmission =
-  | { status: 'success'; message: string }
-  | { status: 'error'; message: string }
+  { status: 'success'; message: string } | { status: 'error'; message: string }
 
 export async function submitExistingSeriesEpisodeRegistration(
   service: Pick<ComicRegistrationService, 'addEpisodeToSeries'>,
