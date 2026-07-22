@@ -26,3 +26,17 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Audit web dependencies (npm audit)
+        id: npm-audit
+        continue-on-error: true
+        working-directory: apps/web
+        run: |
+          npm audit --package-lock-only --json > "$GITHUB_WORKSPACE/npm-audit.json" || true
