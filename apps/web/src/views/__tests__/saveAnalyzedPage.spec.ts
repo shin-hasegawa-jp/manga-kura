@@ -51,13 +51,11 @@ function createDependencies(): SaveAnalyzedPageDependencies {
   }
 
   return {
-    fetchImages: vi.fn(
-      async (): Promise<ImageBlobBatchFetchResult> => ({
-        status: 'success',
-        images: [fetchedImage],
-        failures: [],
-      }),
-    ),
+    fetchImages: vi.fn(async (): Promise<ImageBlobBatchFetchResult> => ({
+      status: 'success',
+      images: [fetchedImage],
+      failures: [],
+    })),
     createImages: vi.fn(() => [registrationImage]),
     register: vi.fn(async (): Promise<{ status: 'success' | 'error' }> => ({ status: 'success' })),
   }
@@ -179,13 +177,11 @@ describe('解析済みページの保存フロー', () => {
 
   it('一部画像の取得に失敗した場合は登録処理を開始しない', async () => {
     const dependencies = createDependencies()
-    dependencies.fetchImages = vi.fn(
-      async (): Promise<ImageBlobBatchFetchResult> => ({
-        status: 'partial-failure',
-        images: [],
-        failures: [],
-      }),
-    )
+    dependencies.fetchImages = vi.fn(async (): Promise<ImageBlobBatchFetchResult> => ({
+      status: 'partial-failure',
+      images: [],
+      failures: [],
+    }))
 
     const result = await saveAnalyzedPage(
       {

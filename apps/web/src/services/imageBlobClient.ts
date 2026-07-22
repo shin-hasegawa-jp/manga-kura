@@ -6,10 +6,7 @@ import {
 import type { ImageCandidate } from './imageCandidateFactory'
 
 export type ImageBlobFetchErrorKind =
-  | 'http'
-  | 'network'
-  | 'unsupportedContentType'
-  | 'missingDimensions'
+  'http' | 'network' | 'unsupportedContentType' | 'missingDimensions'
 
 export interface ImageBlobFetchErrorDetails {
   candidateId: string
