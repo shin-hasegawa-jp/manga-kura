@@ -30,6 +30,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Semgrep scan
+        id: semgrep
+        continue-on-error: true
         run: |
           semgrep scan \
             --config p/default \
@@ -38,3 +40,78 @@ jobs:
             --metrics off \
             --json \
             --output semgrep-results.json
+
+      - name: Comment findings on pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GITHUB_TOKEN"]
+          pr = os.environ["PR_NUMBER"]
+          marker = "<!-- semgrep-ci-report -->"
+          def req(method, url, data=None):
+              body = json.dumps(data).encode() if data is not None else None
+              r = urllib.request.Request(url, data=body, method=method)
+              r.add_header("Authorization", "Bearer " + token)
+              r.add_header("Accept", "application/vnd.github+json")
+              r.add_header("X-GitHub-Api-Version", "2022-11-28")
+              if body is not None:
+                  r.add_header("Content-Type", "application/json")
+              with urllib.request.urlopen(r) as resp:
+                  return json.loads(resp.read() or "null")
+          try:
+              with open("semgrep-results.json", encoding="utf-8") as f:
+                  data = json.load(f)
+              results = data.get("results", [])
+              scan_ok = True
+          except (FileNotFoundError, json.JSONDecodeError):
+              results, scan_ok = [], False
+          order = {"ERROR": 0, "WARNING": 1, "INFO": 2}
+          label = {"ERROR": "🔴 ERROR", "WARNING": "🟡 WARNING", "INFO": "🔵 INFO"}
+          lines = [marker, "## Semgrep 静的解析レポート", ""]
+          if not scan_ok:
+              lines.append("⚠️ スキャン結果を取得できませんでした。ワークフローのログを確認してください。")
+          elif not results:
+              lines.append("✅ 検出はありませんでした。")
+          else:
+              counts = {}
+              for x in results:
+                  s = x.get("extra", {}).get("severity", "INFO")
+                  counts[s] = counts.get(s, 0) + 1
+              summary = " / ".join(label.get(k, k) + ": " + str(counts[k]) for k in sorted(counts, key=lambda s: order.get(s, 9)))
+              lines.append("検出 **" + str(len(results)) + "件** — " + summary)
+              lines.append("")
+              lines.append("> この検出はCIを失敗させません（警告としての通知です）。")
+              lines.append("")
+              lines.append("| 重大度 | ルール | 該当箇所 | 内容 |")
+              lines.append("| --- | --- | --- | --- |")
+              ordered = sorted(results, key=lambda x: order.get(x.get("extra", {}).get("severity", "INFO"), 9))
+              cap = 50
+              for x in ordered[:cap]:
+                  sev = x.get("extra", {}).get("severity", "INFO")
+                  rule = str(x.get("check_id", "")).replace("|", "\\|")
+                  path = str(x.get("path", ""))
+                  ln = x.get("start", {}).get("line", "")
+                  msg = str(x.get("extra", {}).get("message", "")).replace("\n", " ").strip()
+                  if len(msg) > 160:
+                      msg = msg[:157] + "..."
+                  msg = msg.replace("|", "\\|")
+                  lines.append("| " + label.get(sev, sev) + " | `" + rule + "` | `" + path + ":" + str(ln) + "` | " + msg + " |")
+              if len(ordered) > cap:
+                  lines.append("")
+                  lines.append("> 他 " + str(len(ordered) - cap) + " 件の検出があります。詳細はワークフローのログを参照してください。")
+          body = "\n".join(lines)
+          comments = req("GET", api + "/repos/" + repo + "/issues/" + pr + "/comments?per_page=100")
+          existing = next((c for c in comments if marker in (c.get("body") or "")), None)
+          if existing:
+              req("PATCH", api + "/repos/" + repo + "/issues/comments/" + str(existing["id"]), {"body": body})
+          else:
+              req("POST", api + "/repos/" + repo + "/issues/" + pr + "/comments", {"body": body})
+          print("Semgrep PR comment upserted.")
+          PY
