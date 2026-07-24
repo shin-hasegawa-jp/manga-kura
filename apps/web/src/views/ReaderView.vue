@@ -15,6 +15,11 @@ import {
   resolveRestoreScrollTop,
   shouldPersistReadingPosition,
 } from './readingPositionTracker'
+import {
+  INITIAL_READER_CONTROLS_VISIBILITY,
+  isReaderControlsToggleKey,
+  resolveReaderControlsVisibility,
+} from './readerControls'
 import { getReaderBackRoute, getReaderViewState } from './readerViewState'
 
 const READING_POSITION_SAVE_INTERVAL_MS = 2000
@@ -32,6 +37,7 @@ const imageItems = ref<ReaderImageItem[]>([])
 const failedImageIds = ref<ReadonlySet<string>>(new Set())
 const currentImage = ref(1)
 const hasReachedEnd = ref(false)
+const readerControlsVisible = ref(INITIAL_READER_CONTROLS_VISIBILITY)
 const readerState = computed(() =>
   getReaderViewState(isLoading.value, episode.value, series.value, images.value),
 )
@@ -53,6 +59,7 @@ async function loadReader() {
   failedImageIds.value = new Set()
   currentImage.value = 1
   hasReachedEnd.value = false
+  readerControlsVisible.value = INITIAL_READER_CONTROLS_VISIBILITY
   lastPersistedAt = undefined
 
   const routeTarget = getReaderRouteTarget(
@@ -168,6 +175,22 @@ function onReaderScroll() {
   persistReadingPosition()
 }
 
+function toggleReaderControlsFromContent() {
+  readerControlsVisible.value = resolveReaderControlsVisibility(
+    readerControlsVisible.value,
+    'content',
+  )
+}
+
+function onReaderContentKeydown(event: KeyboardEvent) {
+  if (event.target !== event.currentTarget || !isReaderControlsToggleKey(event.key)) {
+    return
+  }
+
+  event.preventDefault()
+  toggleReaderControlsFromContent()
+}
+
 watch(() => route.fullPath, loadReader)
 onMounted(() => {
   void loadReader()
@@ -201,22 +224,34 @@ onBeforeUnmount(() => {
     </section>
 
     <template v-else-if="readerState.kind === 'ready'">
-      <header class="reader-header">
-        <RouterLink class="reader-icon-btn" :to="backRoute" :aria-label="`${contextLabel}へ戻る`">
-          <AppIcon :path="mdiChevronLeft" :size="28" />
-        </RouterLink>
-        <div class="reader-header__title">
-          <h1>{{ readerState.episode.title }}</h1>
-          <p>{{ contextLabel }}</p>
-        </div>
-      </header>
+      <Transition name="reader-controls">
+        <header v-if="readerControlsVisible" class="reader-header">
+          <RouterLink class="reader-icon-btn" :to="backRoute" :aria-label="`${contextLabel}へ戻る`">
+            <AppIcon :path="mdiChevronLeft" :size="28" />
+          </RouterLink>
+          <div class="reader-header__title">
+            <h1>{{ readerState.episode.title }}</h1>
+            <p>{{ contextLabel }}</p>
+          </div>
+        </header>
+      </Transition>
 
-      <ol class="reader-stream">
+      <ol
+        class="reader-stream"
+        tabindex="0"
+        :aria-label="
+          readerControlsVisible
+            ? '漫画閲覧領域。タップ、EnterまたはSpaceでタイトルと進捗を隠す'
+            : '漫画閲覧領域。タップ、EnterまたはSpaceでタイトルと進捗を表示する'
+        "
+        @keydown="onReaderContentKeydown"
+      >
         <li
           v-for="(item, index) in imageItems"
           :key="item.id"
           class="reader-page"
           data-reader-image
+          @click="toggleReaderControlsFromContent"
         >
           <img
             v-if="!failedImageIds.has(item.id)"
@@ -230,7 +265,7 @@ onBeforeUnmount(() => {
           <div v-else class="reader-page__failure" role="alert">
             <AppIcon :path="mdiImageOffOutline" :size="40" />
             <p>この画像は表示できません</p>
-            <button type="button" @click="retryImage(item.id)">
+            <button type="button" @click.stop="retryImage(item.id)">
               <AppIcon :path="mdiReload" :size="18" />
               再読み込み
             </button>
@@ -238,13 +273,21 @@ onBeforeUnmount(() => {
         </li>
       </ol>
 
-      <aside class="reader-progress" aria-live="polite">
-        <span>{{ currentImage }} / {{ imageItems.length }}</span>
-        <span class="reader-progress__track" aria-hidden="true">
-          <span :style="{ width: `${progress}%` }"></span>
-        </span>
-        <span>{{ progress }}%</span>
-      </aside>
+      <p class="visually-hidden" role="status" aria-live="polite">
+        {{
+          readerControlsVisible ? '閲覧コントロールを表示しました' : '閲覧コントロールを隠しました'
+        }}
+      </p>
+
+      <Transition name="reader-controls">
+        <aside v-if="readerControlsVisible" class="reader-progress" aria-live="polite">
+          <span>{{ currentImage }} / {{ imageItems.length }}</span>
+          <span class="reader-progress__track" aria-hidden="true">
+            <span :style="{ width: `${progress}%` }"></span>
+          </span>
+          <span>{{ progress }}%</span>
+        </aside>
+      </Transition>
 
       <section v-if="hasReachedEnd" class="reader-complete" aria-labelledby="reader-complete-title">
         <div class="reader-complete__check"><AppIcon :path="mdiCheck" :size="32" /></div>
@@ -265,14 +308,18 @@ onBeforeUnmount(() => {
   background: #0e0d0c;
 }
 .reader-header {
-  position: sticky;
+  position: fixed;
   z-index: 10;
   top: 0;
+  left: 50%;
   display: flex;
   align-items: center;
   gap: var(--app-space-2xs);
-  padding: var(--app-space-xs);
+  width: min(100%, var(--app-content-max-width));
+  padding: calc(env(safe-area-inset-top) + var(--app-space-xs)) var(--app-space-xs)
+    var(--app-space-xs);
   background: linear-gradient(#0e0d0c, rgba(14, 13, 12, 0.82));
+  transform: translateX(-50%);
 }
 .reader-icon-btn {
   display: grid;
@@ -301,6 +348,10 @@ onBeforeUnmount(() => {
   padding: 0;
   margin: 0;
   list-style: none;
+  outline: 0;
+}
+.reader-stream:focus-visible {
+  box-shadow: inset 0 0 0 0.1875rem #d9b48a;
 }
 .reader-page img {
   display: block;
@@ -336,7 +387,7 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: 10;
   right: var(--app-space-sm);
-  bottom: var(--app-space-sm);
+  bottom: calc(env(safe-area-inset-bottom) + var(--app-space-sm));
   left: var(--app-space-sm);
   display: flex;
   align-items: center;
@@ -346,6 +397,14 @@ onBeforeUnmount(() => {
   font-size: var(--app-font-size-xs);
   background: rgba(14, 13, 12, 0.82);
   border-radius: var(--app-radius-md);
+}
+.reader-controls-enter-active,
+.reader-controls-leave-active {
+  transition: opacity 0.18s ease;
+}
+.reader-controls-enter-from,
+.reader-controls-leave-to {
+  opacity: 0;
 }
 .reader-progress__track {
   flex: 1;
@@ -392,5 +451,12 @@ onBeforeUnmount(() => {
   text-decoration: none;
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--app-radius-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-controls-enter-active,
+  .reader-controls-leave-active {
+    transition: none;
+  }
 }
 </style>
