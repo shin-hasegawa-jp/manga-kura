@@ -39,6 +39,7 @@ async def test_analyze_endpoint_returns_camel_case_candidates() -> None:
     analyzer = PageAnalyzerStub(
         PageAnalysis(
             page_url="https://example.com/comic/1",
+            page_title="作品名 第1話",
             candidates=(
                 AnalyzedImageCandidate(
                     candidate=ImageCandidate(
@@ -66,6 +67,7 @@ async def test_analyze_endpoint_returns_camel_case_candidates() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "pageUrl": "https://example.com/comic/1",
+        "pageTitle": "作品名 第1話",
         "acquisitionMethod": "api",
         "candidates": [
             {
@@ -95,6 +97,7 @@ async def test_analyze_endpoint_returns_empty_candidates() -> None:
 
     assert response.status_code == 200
     assert response.json()["candidates"] == []
+    assert response.json()["pageTitle"] is None
 
 
 @pytest.mark.asyncio

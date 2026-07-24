@@ -11,9 +11,10 @@ export type PageImageAnalysisState =
   | {
       status: 'success'
       pageUrl: string
+      pageTitle?: string
       candidates: ImageCandidate[]
     }
-  | { status: 'empty'; pageUrl: string }
+  | { status: 'empty'; pageUrl: string; pageTitle?: string }
   | {
       status: 'failure'
       kind: PageImageAnalysisFailureKind
@@ -23,7 +24,9 @@ export type PageImageAnalysisState =
 
 export interface PageImageAnalyzerDependencies {
   validateUrl(input: string): PageUrlValidation
-  analyzeViaApi(pageUrl: string): Promise<{ candidates: ApiImageCandidate[] }>
+  analyzeViaApi(
+    pageUrl: string,
+  ): Promise<{ candidates: ApiImageCandidate[]; pageTitle?: string | null }>
   createApiCandidates(candidates: readonly ApiImageCandidate[]): ImageCandidate[]
   scoreCandidates(candidates: readonly ImageCandidate[]): ImageCandidate[]
 }
@@ -42,9 +45,12 @@ function getFailureMessage(cause: unknown, defaultMessage: string): string {
 async function acquireCandidates(
   pageUrl: string,
   dependencies: PageImageAnalyzerDependencies,
-): Promise<ImageCandidate[]> {
+): Promise<{ candidates: ImageCandidate[]; pageTitle?: string }> {
   const response = await dependencies.analyzeViaApi(pageUrl)
-  return dependencies.createApiCandidates(response.candidates)
+  return {
+    candidates: dependencies.createApiCandidates(response.candidates),
+    ...(response.pageTitle ? { pageTitle: response.pageTitle } : {}),
+  }
 }
 
 export async function analyzePageImages(
@@ -65,9 +71,9 @@ export async function analyzePageImages(
     return state
   }
 
-  let candidates: ImageCandidate[]
+  let analysis: { candidates: ImageCandidate[]; pageTitle?: string }
   try {
-    candidates = await acquireCandidates(validation.url, dependencies)
+    analysis = await acquireCandidates(validation.url, dependencies)
   } catch (cause) {
     const state: PageImageAnalysisState = {
       status: 'failure',
@@ -80,19 +86,21 @@ export async function analyzePageImages(
   }
 
   try {
-    if (candidates.length === 0) {
+    if (analysis.candidates.length === 0) {
       const state: PageImageAnalysisState = {
         status: 'empty',
         pageUrl: validation.url,
+        ...(analysis.pageTitle ? { pageTitle: analysis.pageTitle } : {}),
       }
       onStateChange(state)
       return state
     }
 
-    const scoredCandidates = dependencies.scoreCandidates(candidates)
+    const scoredCandidates = dependencies.scoreCandidates(analysis.candidates)
     const state: PageImageAnalysisState = {
       status: 'success',
       pageUrl: validation.url,
+      ...(analysis.pageTitle ? { pageTitle: analysis.pageTitle } : {}),
       candidates: scoredCandidates,
     }
     onStateChange(state)

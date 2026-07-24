@@ -68,5 +68,6 @@ class ImageCandidateResponse(ApiModel):
 
 class AnalyzePageResponse(ApiModel):
     page_url: HttpUrl
+    page_title: str | None = Field(default=None, max_length=200)
     acquisition_method: Literal["api"] = "api"
     candidates: list[ImageCandidateResponse]
