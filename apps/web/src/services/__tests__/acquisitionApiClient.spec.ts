@@ -11,7 +11,7 @@ function createDependencies(fetchStub: typeof fetch): AcquisitionApiClientDepend
   return { fetch: fetchStub, apiBaseUrl }
 }
 
-function createAnalysisResponse(): object {
+function createAnalysisResponse() {
   return {
     pageUrl: 'https://example.com/comic/1',
     acquisitionMethod: 'api',
@@ -21,6 +21,8 @@ function createAnalysisResponse(): object {
         domOrder: 0,
         imageUrl: 'https://cdn.example.com/001.jpg',
         sourceAttribute: 'data-src',
+        parentGroupId: 'image-parent-0',
+        cssClasses: ['comic-page', 'lazy'],
         proxyToken: 'signed-token',
         previewToken: 'preview-token',
       },
@@ -62,6 +64,30 @@ describe('取得APIクライアント', () => {
   it.each([
     ['候補のURLが不正', { ...createAnalysisResponse(), candidates: [{ imageUrl: 'not-url' }] }],
     ['取得方法が不正', { ...createAnalysisResponse(), acquisitionMethod: 'browser' }],
+    [
+      '親グループIDが不正',
+      {
+        ...createAnalysisResponse(),
+        candidates: [
+          {
+            ...createAnalysisResponse().candidates[0],
+            parentGroupId: 'main > article',
+          },
+        ],
+      },
+    ],
+    [
+      'CSSクラスが上限超過',
+      {
+        ...createAnalysisResponse(),
+        candidates: [
+          {
+            ...createAnalysisResponse().candidates[0],
+            cssClasses: Array.from({ length: 9 }, (_, index) => `class-${index}`),
+          },
+        ],
+      },
+    ],
   ])('ページ解析APIの不正な成功レスポンスを拒否する: %s', async (_name, payload) => {
     const fetchStub = vi.fn().mockResolvedValue(Response.json(payload))
 

@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter
 
@@ -54,6 +54,14 @@ class ImageCandidateResponse(ApiModel):
         "data-lazy",
         "src",
     ]
+    parent_group_id: str | None = Field(
+        default=None,
+        max_length=32,
+        pattern=r"^image-parent-\d+$",
+    )
+    css_classes: list[
+        Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
+    ] = Field(default_factory=list, max_length=8)
     proxy_token: str
     preview_token: str
 
