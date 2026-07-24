@@ -28,6 +28,7 @@ import SaveStepIndicator from '@/components/SaveStepIndicator.vue'
 import { getSaveErrorPresentation, markImageFetchFailures } from './acquisitionErrorPresenter'
 import { getSaveOfflineNotice } from './offlineNotice'
 import { getImageCandidateListState } from './imageCandidateListState'
+import { getPreviewImageFetchPriority, getPreviewImageLoading } from './previewImageLoading'
 import {
   clearAllImageCandidateSelections,
   getImageCandidateSelectionState,
@@ -54,7 +55,17 @@ const pageUrl = ref('')
 const pageImageAnalysisState = ref<PageImageAnalysisState>()
 const isSavingAnalyzedPage = ref(false)
 const saveFlowError = ref('')
-let fetchAnalyzedImages = createSelectedImageBlobFetcher()
+const saveProgress = ref({ completedCount: 0, totalCount: 0 })
+
+function createAnalyzedImageFetcher() {
+  return createSelectedImageBlobFetcher({
+    onProgress: (progress) => {
+      saveProgress.value = progress
+    },
+  })
+}
+
+let fetchAnalyzedImages = createAnalyzedImageFetcher()
 // 進行中の解析を識別し、キャンセル・URL編集で古い解析結果を無視する
 let analysisToken = 0
 // 画像確認（ステップ2）と情報入力（ステップ3）の切り替え
@@ -213,7 +224,7 @@ async function analyzePageUrl() {
   }
 
   const token = ++analysisToken
-  fetchAnalyzedImages = createSelectedImageBlobFetcher()
+  fetchAnalyzedImages = createAnalyzedImageFetcher()
   saveFlowError.value = ''
   saveStage.value = 'image'
   showRegistrationErrors.value = false
@@ -325,6 +336,7 @@ async function saveCurrentRegistration(options: { force?: boolean } = {}) {
   }
 
   isSavingAnalyzedPage.value = true
+  saveProgress.value = { completedCount: 0, totalCount: validation.candidates.length }
   saveStage.value = 'saving'
 
   try {
@@ -352,7 +364,7 @@ async function saveCurrentRegistration(options: { force?: boolean } = {}) {
     completedRegistration.value = completion
     pageUrl.value = ''
     pageImageAnalysisState.value = undefined
-    fetchAnalyzedImages = createSelectedImageBlobFetcher()
+    fetchAnalyzedImages = createAnalyzedImageFetcher()
     saveStage.value = 'complete'
     previewErrorIds.value = new Set()
     showRegistrationErrors.value = false
@@ -452,7 +464,13 @@ function selectRegistrationMode(mode: RegistrationMode) {
     <section v-if="saveStage === 'saving'" class="saving-state" aria-live="polite" aria-busy="true">
       <span class="saving-state__spinner" aria-hidden="true"></span>
       <h1 class="app-heading saving-state__title">蔵にしまっています</h1>
-      <p>{{ imageCandidateSelectionState.selectedCount }}枚の画像を保存しています</p>
+      <p>
+        {{
+          saveProgress.totalCount > 0
+            ? `${saveProgress.completedCount} / ${saveProgress.totalCount}枚を処理中`
+            : `${imageCandidateSelectionState.selectedCount}枚の画像を保存しています`
+        }}
+      </p>
       <p class="saving-state__wait">画面を閉じずにお待ちください</p>
       <span class="saving-state__bar" aria-hidden="true"><span></span></span>
       <p class="saving-state__lock">
@@ -643,7 +661,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
         </div>
 
         <ul class="candidate-grid">
-          <li v-for="candidate in imageCandidateListState.candidates" :key="candidate.id">
+          <li v-for="(candidate, index) in imageCandidateListState.candidates" :key="candidate.id">
             <label
               class="candidate-card"
               :class="{
@@ -665,6 +683,9 @@ function selectRegistrationMode(mode: RegistrationMode) {
                   class="candidate-card__image"
                   :src="getCandidatePreviewUrl(candidate)"
                   :alt="`画像候補 ${candidate.domOrder + 1}`"
+                  :loading="getPreviewImageLoading(index)"
+                  :fetchpriority="getPreviewImageFetchPriority(index)"
+                  decoding="async"
                   @error="onPreviewError(candidate.id)"
                 />
                 <span v-else class="candidate-card__failure">

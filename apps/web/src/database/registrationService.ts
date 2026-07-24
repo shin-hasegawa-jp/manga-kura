@@ -139,9 +139,7 @@ export function createComicRegistrationService(
         async () => {
           await repository.series.save(series)
           await repository.episodes.save(episode)
-          for (const image of images) {
-            await repository.images.save(image)
-          }
+          await repository.images.saveMany(images)
         },
       )
 
@@ -163,9 +161,7 @@ export function createComicRegistrationService(
 
       await database.transaction('rw', database.episodes, database.images, async () => {
         await repository.episodes.save(episode)
-        for (const image of images) {
-          await repository.images.save(image)
-        }
+        await repository.images.saveMany(images)
       })
 
       return { episode, images }
@@ -205,9 +201,7 @@ export function createComicRegistrationService(
 
           await repository.series.save(series)
           await repository.episodes.save(episode)
-          for (const image of images) {
-            await repository.images.save(image)
-          }
+          await repository.images.saveMany(images)
 
           return { series, episode, images }
         },
