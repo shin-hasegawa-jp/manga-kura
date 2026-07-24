@@ -50,15 +50,24 @@ class DomainAccessLimiter:
         self._interval_seconds = interval_seconds
         self._clock = clock
         self._sleep = sleep
-        self._last_access_by_domain: dict[str, float] = {}
+        self._next_access_by_domain: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
     async def require(self, domain: str) -> None:
         async with self._lock:
             now = self._clock()
-            last_access = self._last_access_by_domain.get(domain)
-            if last_access is not None:
-                remaining = last_access + self._interval_seconds - now
-                if remaining > 0:
-                    await self._sleep(remaining)
-            self._last_access_by_domain[domain] = self._clock()
+            for stored_domain, next_access in tuple(
+                self._next_access_by_domain.items()
+            ):
+                if next_access <= now:
+                    del self._next_access_by_domain[stored_domain]
+
+            reserved_at = max(
+                now,
+                self._next_access_by_domain.get(domain, now),
+            )
+            self._next_access_by_domain[domain] = reserved_at + self._interval_seconds
+
+        remaining = reserved_at - self._clock()
+        if remaining > 0:
+            await self._sleep(remaining)
