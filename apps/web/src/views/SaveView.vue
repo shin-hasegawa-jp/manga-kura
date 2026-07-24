@@ -28,6 +28,7 @@ import SaveStepIndicator from '@/components/SaveStepIndicator.vue'
 import { getSaveErrorPresentation, markImageFetchFailures } from './acquisitionErrorPresenter'
 import { getSaveOfflineNotice } from './offlineNotice'
 import { getImageCandidateListState } from './imageCandidateListState'
+import { getPreviewImageFetchPriority, getPreviewImageLoading } from './previewImageLoading'
 import {
   clearAllImageCandidateSelections,
   getImageCandidateSelectionState,
@@ -643,7 +644,7 @@ function selectRegistrationMode(mode: RegistrationMode) {
         </div>
 
         <ul class="candidate-grid">
-          <li v-for="candidate in imageCandidateListState.candidates" :key="candidate.id">
+          <li v-for="(candidate, index) in imageCandidateListState.candidates" :key="candidate.id">
             <label
               class="candidate-card"
               :class="{
@@ -665,6 +666,9 @@ function selectRegistrationMode(mode: RegistrationMode) {
                   class="candidate-card__image"
                   :src="getCandidatePreviewUrl(candidate)"
                   :alt="`画像候補 ${candidate.domOrder + 1}`"
+                  :loading="getPreviewImageLoading(index)"
+                  :fetchpriority="getPreviewImageFetchPriority(index)"
+                  decoding="async"
                   @error="onPreviewError(candidate.id)"
                 />
                 <span v-else class="candidate-card__failure">
