@@ -35,13 +35,25 @@ def test_images_are_extracted_in_dom_order_with_unique_ids() -> None:
 
     assert extract_image_candidates(html, PAGE_URL) == (
         ImageCandidate(
-            "image-candidate-0", 0, "https://example.com/images/page-01.jpg", "src"
+            "image-candidate-0",
+            0,
+            "https://example.com/images/page-01.jpg",
+            "src",
+            "image-parent-0",
         ),
         ImageCandidate(
-            "image-candidate-1", 1, "https://cdn.example.com/page-02.jpg", "src"
+            "image-candidate-1",
+            1,
+            "https://cdn.example.com/page-02.jpg",
+            "src",
+            "image-parent-1",
         ),
         ImageCandidate(
-            "image-candidate-2", 2, "https://cdn.example.com/page-03.jpg", "src"
+            "image-candidate-2",
+            2,
+            "https://cdn.example.com/page-03.jpg",
+            "src",
+            "image-parent-0",
         ),
     )
 
@@ -57,7 +69,11 @@ def test_missing_empty_and_duplicate_sources_are_excluded() -> None:
 
     assert extract_image_candidates(html, PAGE_URL) == (
         ImageCandidate(
-            "image-candidate-0", 0, "https://example.com/images/page.jpg", "src"
+            "image-candidate-0",
+            0,
+            "https://example.com/images/page.jpg",
+            "src",
+            "image-parent-0",
         ),
     )
 
@@ -198,6 +214,7 @@ def test_non_http_and_unresolvable_urls_are_excluded() -> None:
             0,
             "https://example.com/images/valid.jpg",
             "src",
+            "image-parent-0",
         ),
     )
 
@@ -215,6 +232,7 @@ def test_duplicates_after_url_resolution_keep_first_candidate() -> None:
             0,
             "https://example.com/images/page.jpg",
             "src",
+            "image-parent-0",
         ),
     )
 
@@ -228,3 +246,72 @@ def test_malformed_html_fragment_is_parsed() -> None:
         "https://example.com/1.jpg",
         "https://example.com/2.jpg",
     )
+
+
+def test_same_direct_parent_uses_same_group_id() -> None:
+    candidates = extract_image_candidates(
+        """
+        <main>
+          <img src="/1.jpg">
+          <img src="/2.jpg">
+        </main>
+        <aside><img src="/advert.jpg"></aside>
+        """,
+        PAGE_URL,
+    )
+
+    assert candidates[0].parent_group_id == candidates[1].parent_group_id
+    assert candidates[0].parent_group_id != candidates[2].parent_group_id
+
+
+def test_nested_images_use_their_direct_parent() -> None:
+    candidates = extract_image_candidates(
+        """
+        <main>
+          <figure><img src="/1.jpg"></figure>
+          <figure><img src="/2.jpg"></figure>
+        </main>
+        """,
+        PAGE_URL,
+    )
+
+    assert candidates[0].parent_group_id != candidates[1].parent_group_id
+
+
+def test_common_css_classes_are_extracted_without_duplicates() -> None:
+    candidates = extract_image_candidates(
+        """
+        <img class="comic-page lazy comic-page" src="/1.jpg">
+        <img class="comic-page" src="/2.jpg">
+        <img src="/3.jpg">
+        """,
+        PAGE_URL,
+    )
+
+    assert candidates[0].css_classes == ("comic-page", "lazy")
+    assert candidates[1].css_classes == ("comic-page",)
+    assert candidates[2].css_classes == ()
+
+
+def test_css_classes_are_bounded_and_invalid_values_are_ignored() -> None:
+    classes = " ".join([f"class-{index}" for index in range(10)])
+    candidate = extract_image_candidates(
+        f'<img class="{classes} 日本語" src="/1.jpg">', PAGE_URL
+    )[0]
+
+    assert candidate.css_classes == tuple(f"class-{index}" for index in range(8))
+
+
+def test_lazy_loaded_image_keeps_dom_group_information() -> None:
+    candidates = extract_image_candidates(
+        """
+        <div>
+          <img class="comic-page" data-src="/1.jpg">
+          <img class="comic-page" data-original="/2.jpg">
+        </div>
+        """,
+        PAGE_URL,
+    )
+
+    assert candidates[0].parent_group_id == candidates[1].parent_group_id
+    assert candidates[0].css_classes == ("comic-page",)
