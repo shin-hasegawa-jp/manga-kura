@@ -10,6 +10,7 @@ describe('登録用データのバリデーション', () => {
     const registration = {
       seriesTitle: '作品1',
       title: '第1話',
+      episodeNumber: 1,
       sourcePageUrl: 'https://example.com/episodes/1',
     }
 
@@ -20,6 +21,23 @@ describe('登録用データのバリデーション', () => {
     expect(() => validateCreateSeriesRegistration({ ...registration, title: undefined })).toThrow()
     expect(() =>
       validateCreateSeriesRegistration({ ...registration, sourcePageUrl: undefined }),
+    ).toThrow()
+  })
+
+  it('話数は0以上の整数だけを受け入れる', () => {
+    const registration = {
+      title: '第2話',
+      sourcePageUrl: 'https://example.com/episodes/2',
+    }
+
+    expect(
+      validateCreateStandaloneEpisodeRegistration({ ...registration, episodeNumber: 2 }),
+    ).toMatchObject({ episodeNumber: 2 })
+    expect(() =>
+      validateCreateStandaloneEpisodeRegistration({ ...registration, episodeNumber: -1 }),
+    ).toThrow()
+    expect(() =>
+      validateCreateStandaloneEpisodeRegistration({ ...registration, episodeNumber: 1.5 }),
     ).toThrow()
   })
 

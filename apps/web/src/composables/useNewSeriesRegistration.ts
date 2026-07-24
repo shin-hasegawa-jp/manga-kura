@@ -9,6 +9,7 @@ import { registrationService } from './registrationDependencies'
 export function useNewSeriesRegistration() {
   const newSeriesTitle = ref('')
   const newSeriesEpisodeTitle = ref('')
+  const newSeriesEpisodeNumber = ref<number>()
   const newSeriesSourcePageUrl = ref('')
   const newSeriesSubmission = ref<NewSeriesRegistrationSubmission>()
   const isSubmittingNewSeries = ref(false)
@@ -22,6 +23,7 @@ export function useNewSeriesRegistration() {
         {
           seriesTitle: newSeriesTitle.value,
           title: newSeriesEpisodeTitle.value,
+          episodeNumber: newSeriesEpisodeNumber.value,
           sourcePageUrl: newSeriesSourcePageUrl.value,
         },
         images,
@@ -35,6 +37,7 @@ export function useNewSeriesRegistration() {
   function resetNewSeriesFields() {
     newSeriesTitle.value = ''
     newSeriesEpisodeTitle.value = ''
+    newSeriesEpisodeNumber.value = undefined
     newSeriesSourcePageUrl.value = ''
   }
 
@@ -45,6 +48,7 @@ export function useNewSeriesRegistration() {
   return {
     newSeriesTitle,
     newSeriesEpisodeTitle,
+    newSeriesEpisodeNumber,
     newSeriesSourcePageUrl,
     newSeriesSubmission,
     isSubmittingNewSeries,

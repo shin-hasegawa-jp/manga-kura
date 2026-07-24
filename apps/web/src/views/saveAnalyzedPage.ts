@@ -12,13 +12,15 @@ export type AnalyzedPageRegistrationDetails =
       mode: 'newSeries'
       seriesTitle: string
       title: string
+      episodeNumber?: number
       sourcePageUrl: string
     }
-  | { mode: 'standaloneEpisode'; title: string; sourcePageUrl: string }
+  | { mode: 'standaloneEpisode'; title: string; episodeNumber?: number; sourcePageUrl: string }
   | {
       mode: 'existingSeries'
       seriesId: string
       title: string
+      episodeNumber?: number
       sourcePageUrl: string
     }
 

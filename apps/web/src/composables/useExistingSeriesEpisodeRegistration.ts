@@ -11,6 +11,7 @@ export function useExistingSeriesEpisodeRegistration() {
   const seriesOptions = ref<Series[]>([])
   const existingSeriesId = ref('')
   const existingSeriesEpisodeTitle = ref('')
+  const existingSeriesEpisodeNumber = ref<number>()
   const existingSeriesEpisodeSourcePageUrl = ref('')
   const existingSeriesEpisodeSubmission = ref<ExistingSeriesEpisodeRegistrationSubmission>()
   const isSubmittingExistingSeriesEpisode = ref(false)
@@ -28,6 +29,7 @@ export function useExistingSeriesEpisodeRegistration() {
         {
           seriesId: existingSeriesId.value,
           title: existingSeriesEpisodeTitle.value,
+          episodeNumber: existingSeriesEpisodeNumber.value,
           sourcePageUrl: existingSeriesEpisodeSourcePageUrl.value,
         },
         images,
@@ -41,6 +43,7 @@ export function useExistingSeriesEpisodeRegistration() {
   function resetExistingSeriesEpisodeFields() {
     existingSeriesId.value = ''
     existingSeriesEpisodeTitle.value = ''
+    existingSeriesEpisodeNumber.value = undefined
     existingSeriesEpisodeSourcePageUrl.value = ''
   }
 
@@ -56,6 +59,7 @@ export function useExistingSeriesEpisodeRegistration() {
     seriesOptions,
     existingSeriesId,
     existingSeriesEpisodeTitle,
+    existingSeriesEpisodeNumber,
     existingSeriesEpisodeSourcePageUrl,
     existingSeriesEpisodeSubmission,
     isSubmittingExistingSeriesEpisode,
