@@ -28,6 +28,8 @@ IMAGE_SOURCE_ATTRIBUTE_PRIORITY: tuple[ImageSourceAttribute, ...] = (
 )
 SRCSET_WIDTH_PATTERN = re.compile(r"^(\d+)w$")
 SRCSET_DENSITY_PATTERN = re.compile(r"^(\d+(?:\.\d+)?)x$")
+CSS_CLASS_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+MAX_CSS_CLASSES = 8
 
 
 @dataclass(frozen=True)
@@ -36,12 +38,16 @@ class ImageCandidate:
     dom_order: int
     image_url: str
     source_attribute: ImageSourceAttribute
+    parent_group_id: str | None = None
+    css_classes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class _ExtractedSource:
     source: str
     source_attribute: ImageSourceAttribute
+    parent_group_id: str | None = None
+    css_classes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -112,9 +118,28 @@ def _is_image_element(tag: Tag) -> bool:
     return tag.name == "input" and _get_string_attribute(tag, "type").lower() == "image"
 
 
+def _extract_css_classes(image: Tag) -> tuple[str, ...]:
+    value = image.get("class")
+    if not isinstance(value, list):
+        return ()
+
+    unique_classes: list[str] = []
+    for item in value:
+        if (
+            isinstance(item, str)
+            and CSS_CLASS_PATTERN.fullmatch(item) is not None
+            and item not in unique_classes
+        ):
+            unique_classes.append(item)
+        if len(unique_classes) == MAX_CSS_CLASSES:
+            break
+    return tuple(unique_classes)
+
+
 def _extract_unique_sources(soup: BeautifulSoup) -> tuple[_ExtractedSource, ...]:
     candidates: list[_ExtractedSource] = []
     seen_sources: set[str] = set()
+    parent_group_ids: dict[int, str] = {}
     for image in soup.find_all(("img", "input")):
         if not isinstance(image, Tag) or not _is_image_element(image):
             continue
@@ -122,7 +147,21 @@ def _extract_unique_sources(soup: BeautifulSoup) -> tuple[_ExtractedSource, ...]
         if candidate is None or candidate.source in seen_sources:
             continue
         seen_sources.add(candidate.source)
-        candidates.append(candidate)
+        parent = image.parent
+        parent_group_id: str | None = None
+        if isinstance(parent, Tag):
+            parent_key = id(parent)
+            parent_group_id = parent_group_ids.setdefault(
+                parent_key, f"image-parent-{len(parent_group_ids)}"
+            )
+        candidates.append(
+            _ExtractedSource(
+                source=candidate.source,
+                source_attribute=candidate.source_attribute,
+                parent_group_id=parent_group_id,
+                css_classes=_extract_css_classes(image),
+            )
+        )
     return tuple(candidates)
 
 
@@ -157,7 +196,14 @@ def extract_image_candidates(html: str, page_url: str) -> tuple[ImageCandidate, 
         if image_url is None or image_url in seen_urls:
             continue
         seen_urls.add(image_url)
-        resolved_sources.append(_ExtractedSource(image_url, candidate.source_attribute))
+        resolved_sources.append(
+            _ExtractedSource(
+                image_url,
+                candidate.source_attribute,
+                candidate.parent_group_id,
+                candidate.css_classes,
+            )
+        )
 
     return tuple(
         ImageCandidate(
@@ -165,6 +211,8 @@ def extract_image_candidates(html: str, page_url: str) -> tuple[ImageCandidate, 
             dom_order=dom_order,
             image_url=candidate.source,
             source_attribute=candidate.source_attribute,
+            parent_group_id=candidate.parent_group_id,
+            css_classes=candidate.css_classes,
         )
         for dom_order, candidate in enumerate(resolved_sources)
     )

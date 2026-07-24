@@ -46,6 +46,8 @@ async def test_analyze_endpoint_returns_camel_case_candidates() -> None:
                         dom_order=0,
                         image_url="https://example.com/1.jpg",
                         source_attribute="src",
+                        parent_group_id="image-parent-0",
+                        css_classes=("comic-page", "lazy"),
                     ),
                     proxy_token="token",
                     preview_token="preview-token",
@@ -71,6 +73,8 @@ async def test_analyze_endpoint_returns_camel_case_candidates() -> None:
                 "domOrder": 0,
                 "imageUrl": "https://example.com/1.jpg",
                 "sourceAttribute": "src",
+                "parentGroupId": "image-parent-0",
+                "cssClasses": ["comic-page", "lazy"],
                 "proxyToken": "token",
                 "previewToken": "preview-token",
             }

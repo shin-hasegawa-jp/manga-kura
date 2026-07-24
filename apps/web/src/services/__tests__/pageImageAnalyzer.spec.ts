@@ -17,6 +17,8 @@ function createApiCandidate(): ApiImageCandidate {
     domOrder: 0,
     imageUrl: 'https://cdn.example.com/page01.jpg',
     sourceAttribute: 'src',
+    parentGroupId: 'image-parent-0',
+    cssClasses: ['comic-page'],
     proxyToken: 'signed-token',
     previewToken: 'preview-token',
   }

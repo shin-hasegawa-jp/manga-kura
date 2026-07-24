@@ -42,6 +42,8 @@ async def analyze_page(
                 dom_order=result.candidate.dom_order,
                 image_url=parse_http_url(result.candidate.image_url),
                 source_attribute=result.candidate.source_attribute,
+                parent_group_id=result.candidate.parent_group_id,
+                css_classes=list(result.candidate.css_classes),
                 proxy_token=result.proxy_token,
                 preview_token=result.preview_token,
             )

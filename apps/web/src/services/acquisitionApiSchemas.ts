@@ -16,6 +16,11 @@ const apiImageCandidateSchema = v.object({
   domOrder: v.pipe(v.number(), v.integer(), v.minValue(0)),
   imageUrl: v.pipe(v.string(), v.url()),
   sourceAttribute: imageSourceAttributeSchema,
+  parentGroupId: v.nullable(v.pipe(v.string(), v.maxLength(32), v.regex(/^image-parent-\d+$/))),
+  cssClasses: v.pipe(
+    v.array(v.pipe(v.string(), v.nonEmpty(), v.maxLength(64), v.regex(/^[A-Za-z0-9_-]+$/))),
+    v.maxLength(8),
+  ),
   proxyToken: v.pipe(v.string(), v.nonEmpty()),
   previewToken: v.pipe(v.string(), v.nonEmpty()),
 })

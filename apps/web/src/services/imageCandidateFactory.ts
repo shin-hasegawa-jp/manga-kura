@@ -5,6 +5,8 @@ export type ImageCandidateFetchStatus = 'idle' | 'loading' | 'loaded' | 'failed'
 export type ImageCandidateSelectionReason =
   | 'sequential-filename'
   | 'continuous-dom-order'
+  | 'same-parent-group'
+  | 'common-css-class'
   | 'common-url-path'
   | 'large-image'
   | 'portrait-aspect-ratio'
@@ -18,6 +20,8 @@ export interface ImageCandidate {
   domOrder: number
   imageUrl: string
   sourceAttribute: ApiImageCandidate['sourceAttribute']
+  parentGroupId?: ApiImageCandidate['parentGroupId']
+  cssClasses?: readonly string[]
   isSelected: boolean
   score: number
   selectionReasons: ImageCandidateSelectionReason[]

@@ -13,6 +13,8 @@ function createApiCandidate(
     domOrder,
     imageUrl,
     sourceAttribute,
+    parentGroupId: 'image-parent-0',
+    cssClasses: ['comic-page'],
     proxyToken: `proxy-token-${id}`,
     previewToken: `preview-token-${id}`,
   }
