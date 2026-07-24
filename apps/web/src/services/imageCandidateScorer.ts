@@ -46,6 +46,7 @@ function getUrlContext(candidate: ImageCandidate): CandidateContext {
 function getRepeatedKeys(
   contexts: readonly CandidateContext[],
   selectKey: (context: CandidateContext) => string | undefined,
+  minimumCount = 2,
 ): Set<string> {
   const counts = new Map<string, number>()
 
@@ -56,7 +57,23 @@ function getRepeatedKeys(
     }
   }
 
-  return new Set([...counts.entries()].filter(([, count]) => count >= 2).map(([key]) => key))
+  return new Set(
+    [...counts.entries()].filter(([, count]) => count >= minimumCount).map(([key]) => key),
+  )
+}
+
+function getCommonCssClasses(contexts: readonly CandidateContext[]): Set<string> {
+  const counts = new Map<string, number>()
+
+  for (const { candidate } of contexts) {
+    for (const cssClass of new Set(candidate.cssClasses ?? [])) {
+      counts.set(cssClass, (counts.get(cssClass) ?? 0) + 1)
+    }
+  }
+
+  return new Set(
+    [...counts.entries()].filter(([, count]) => count >= 3).map(([cssClass]) => cssClass),
+  )
 }
 
 function getSequentialKeys(contexts: readonly CandidateContext[]): Set<string> {
@@ -143,6 +160,11 @@ export function scoreAndSelectImageCandidates(
 ): ImageCandidate[] {
   const contexts = candidates.map(getUrlContext)
   const commonDirectoryKeys = getRepeatedKeys(contexts, ({ directoryKey }) => directoryKey)
+  const commonParentGroupIds = getRepeatedKeys(
+    contexts,
+    ({ candidate }) => candidate.parentGroupId ?? undefined,
+  )
+  const commonCssClasses = getCommonCssClasses(contexts)
   const sequentialKeys = getSequentialKeys(contexts)
 
   return contexts.map((context) => {
@@ -156,6 +178,16 @@ export function scoreAndSelectImageCandidates(
     }
     if (context.directoryKey !== undefined && commonDirectoryKeys.has(context.directoryKey)) {
       adjustments.push({ points: 10, reason: 'common-url-path' })
+    }
+    if (
+      context.candidate.parentGroupId !== undefined &&
+      context.candidate.parentGroupId !== null &&
+      commonParentGroupIds.has(context.candidate.parentGroupId)
+    ) {
+      adjustments.push({ points: 15, reason: 'same-parent-group' })
+    }
+    if ((context.candidate.cssClasses ?? []).some((cssClass) => commonCssClasses.has(cssClass))) {
+      adjustments.push({ points: 10, reason: 'common-css-class' })
     }
     adjustments.push(...getDimensionAdjustments(context.candidate))
     if (hasDecorativeFilename(context.candidate.imageUrl)) {

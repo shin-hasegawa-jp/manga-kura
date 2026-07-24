@@ -11,12 +11,17 @@ function createCandidate(
   imageUrl: string,
   width: number,
   height: number,
+  domContext: {
+    parentGroupId?: string | null
+    cssClasses?: readonly string[]
+  } = {},
 ): ImageCandidate {
   return {
     id,
     domOrder,
     imageUrl,
     sourceAttribute: 'src',
+    ...domContext,
     isSelected: false,
     score: 0,
     selectionReasons: [],
@@ -91,6 +96,105 @@ describe('画像候補のデフォルト選択スコア', () => {
     expect(scored[0]?.selectionReasons).toContain('common-url-path')
     expect(scored[1]?.selectionReasons).toContain('common-url-path')
     expect(scored[2]?.selectionReasons).not.toContain('common-url-path')
+  })
+
+  it('同じ親要素の大きな縦長画像をグループとして初期選択する', () => {
+    const candidates = [
+      createCandidate('page-1', 0, 'https://cdn-a.example.com/first.jpg', 800, 1200, {
+        parentGroupId: 'image-parent-0',
+      }),
+      createCandidate('page-2', 1, 'https://cdn-b.example.com/second.jpg', 800, 1200, {
+        parentGroupId: 'image-parent-0',
+      }),
+    ]
+
+    const scored = scoreAndSelectImageCandidates(candidates)
+
+    expect(scored.every(({ isSelected }) => isSelected)).toBe(true)
+    expect(
+      scored.every(({ selectionReasons }) => selectionReasons.includes('same-parent-group')),
+    ).toBe(true)
+  })
+
+  it('3件以上に共通するCSSクラスをグループ判定へ利用する', () => {
+    const candidates = [1, 2, 3].map((number) =>
+      createCandidate(
+        `page-${number}`,
+        number - 1,
+        `https://example.com/comic-${number}/page.jpg`,
+        800,
+        1200,
+        { cssClasses: ['comic-page'] },
+      ),
+    )
+
+    const scored = scoreAndSelectImageCandidates(candidates)
+
+    expect(
+      scored.every(({ selectionReasons }) => selectionReasons.includes('common-css-class')),
+    ).toBe(true)
+    expect(scored.every(({ isSelected }) => isSelected)).toBe(false)
+  })
+
+  it('2件だけの共通CSSクラスをグループ根拠にしない', () => {
+    const candidates = [1, 2].map((number) =>
+      createCandidate(
+        `image-${number}`,
+        number - 1,
+        `https://cdn-${number}.example.com/image.jpg`,
+        800,
+        1200,
+        { cssClasses: ['responsive-image'] },
+      ),
+    )
+
+    const scored = scoreAndSelectImageCandidates(candidates)
+
+    expect(
+      scored.every(({ selectionReasons }) => !selectionReasons.includes('common-css-class')),
+    ).toBe(true)
+  })
+
+  it('別の親要素にある広告を漫画画像グループへ含めない', () => {
+    const candidates = [
+      createCandidate('page-1', 0, 'https://example.com/comic/01.jpg', 800, 1200, {
+        parentGroupId: 'image-parent-0',
+        cssClasses: ['comic-page'],
+      }),
+      createCandidate('page-2', 1, 'https://example.com/comic/02.jpg', 800, 1200, {
+        parentGroupId: 'image-parent-0',
+        cssClasses: ['comic-page'],
+      }),
+      createCandidate('page-3', 2, 'https://example.com/comic/03.jpg', 800, 1200, {
+        parentGroupId: 'image-parent-0',
+        cssClasses: ['comic-page'],
+      }),
+      createCandidate('advert', 3, 'https://example.com/ads/banner.jpg', 1200, 250, {
+        parentGroupId: 'image-parent-1',
+        cssClasses: ['responsive-image'],
+      }),
+    ]
+
+    const scored = scoreAndSelectImageCandidates(candidates)
+
+    expect(scored.filter(({ isSelected }) => isSelected).map(({ id }) => id)).toEqual([
+      'page-1',
+      'page-2',
+      'page-3',
+    ])
+    expect(scored[3]?.selectionReasons).not.toContain('same-parent-group')
+    expect(scored[3]?.selectionReasons).not.toContain('common-css-class')
+  })
+
+  it('DOM情報がない候補は既存の判定結果を維持する', () => {
+    const candidates = [
+      createCandidate('page-1', 0, 'https://example.com/comic/page01.jpg', 800, 1200),
+      createCandidate('page-2', 1, 'https://example.com/comic/page02.jpg', 800, 1200),
+    ]
+
+    expect(scoreAndSelectImageCandidates(candidates).every(({ isSelected }) => isSelected)).toBe(
+      true,
+    )
   })
 
   it('ロゴ・広告・サムネイルが混在しても漫画ページだけを初期選択する', () => {
