@@ -57,3 +57,13 @@
 
 - Backend：Ruff format、Ruff check、mypy、pytest 134件成功
 - Frontend：Prettier、ESLint、型チェック、Vitest 268件成功、production build成功
+
+## レビュー構成
+
+1. 作業範囲とAPI・Frontendの責務
+2. API内部のDOMグループ情報抽出
+3. Pydantic・Valibotを含むAPI契約
+4. Frontendのスコアリングと誤選択防止
+5. 自動検証と実在サイトの確認結果
+
+Pull Requestでは、DOMグループの定義、加点条件、レスポンス上限、変更前後の再現結果、実在サイト確認、自動検証をこの順で確認する。
