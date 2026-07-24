@@ -117,6 +117,23 @@ describe('選択画像のBlob取得', () => {
     expect(fetchProxiedImage).not.toHaveBeenCalledWith(candidates[1]?.proxyToken)
   })
 
+  it('変更前は選択画像を1件ずつ取得する', async () => {
+    const candidates = [createCandidate('1'), createCandidate('2'), createCandidate('3')]
+    let activeCount = 0
+    let maximumActiveCount = 0
+    const fetchProxiedImage = vi.fn(async () => {
+      activeCount += 1
+      maximumActiveCount = Math.max(maximumActiveCount, activeCount)
+      await Promise.resolve()
+      activeCount -= 1
+      return createProxiedImage()
+    })
+
+    await fetchSelectedImageBlobs(candidates, { fetchProxiedImage })
+
+    expect(maximumActiveCount).toBe(1)
+  })
+
   it('一部画像の取得失敗を成功画像と分けて返す', async () => {
     const candidates = [createCandidate('1'), createCandidate('2'), createCandidate('3')]
     const fetchProxiedImage = vi
