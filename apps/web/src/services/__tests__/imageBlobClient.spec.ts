@@ -117,8 +117,8 @@ describe('選択画像のBlob取得', () => {
     expect(fetchProxiedImage).not.toHaveBeenCalledWith(candidates[1]?.proxyToken)
   })
 
-  it('変更前は選択画像を1件ずつ取得する', async () => {
-    const candidates = [createCandidate('1'), createCandidate('2'), createCandidate('3')]
+  it('最大4件ずつ並行取得し、元の候補順で返す', async () => {
+    const candidates = Array.from({ length: 6 }, (_, index) => createCandidate(String(index + 1)))
     let activeCount = 0
     let maximumActiveCount = 0
     const fetchProxiedImage = vi.fn(async () => {
@@ -129,9 +129,29 @@ describe('選択画像のBlob取得', () => {
       return createProxiedImage()
     })
 
-    await fetchSelectedImageBlobs(candidates, { fetchProxiedImage })
+    const result = await fetchSelectedImageBlobs(candidates, { fetchProxiedImage })
 
-    expect(maximumActiveCount).toBe(1)
+    expect(maximumActiveCount).toBe(4)
+    expect(result.images.map(({ candidateId }) => candidateId)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+    ])
+  })
+
+  it('取得完了数を通知する', async () => {
+    const onProgress = vi.fn()
+
+    await fetchSelectedImageBlobs([createCandidate('1'), createCandidate('2')], {
+      fetchProxiedImage: vi.fn(async () => createProxiedImage()),
+      onProgress,
+    })
+
+    expect(onProgress).toHaveBeenNthCalledWith(1, { completedCount: 1, totalCount: 2 })
+    expect(onProgress).toHaveBeenNthCalledWith(2, { completedCount: 2, totalCount: 2 })
   })
 
   it('一部画像の取得失敗を成功画像と分けて返す', async () => {

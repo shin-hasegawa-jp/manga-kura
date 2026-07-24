@@ -56,9 +56,16 @@ export type ImageBlobBatchFetchResult =
 export interface ImageBlobClientDependencies {
   fetchProxiedImage?(proxyToken: string): Promise<ProxiedImage>
   loadBlobDimensions?(blob: Blob): Promise<{ width: number; height: number }>
+  onProgress?(progress: ImageBlobFetchProgress): void
+}
+
+export interface ImageBlobFetchProgress {
+  completedCount: number
+  totalCount: number
 }
 
 const defaultDependencies: ImageBlobClientDependencies = {}
+const MAX_CONCURRENT_IMAGE_FETCHES = 4
 
 function loadBrowserBlobDimensions(blob: Blob): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
@@ -169,25 +176,48 @@ export async function fetchSelectedImageBlobs(
   dependencies: ImageBlobClientDependencies = defaultDependencies,
 ): Promise<ImageBlobBatchFetchResult> {
   const selectedCandidates = candidates.filter(({ isSelected }) => isSelected)
-  const results: ({ image: FetchedImageBlob } | { error: ImageBlobFetchError })[] = []
-  for (const candidate of selectedCandidates) {
-    try {
-      results.push({ image: await fetchImageBlob(candidate, dependencies) })
-    } catch (error) {
-      results.push({
-        error:
-          error instanceof ImageBlobFetchError
-            ? error
-            : new ImageBlobFetchError('network', '画像の取得中にエラーが発生しました。', {
-                candidateId: candidate.id,
-                imageUrl: candidate.imageUrl,
-              }),
+  const results: ({ image: FetchedImageBlob } | { error: ImageBlobFetchError } | undefined)[] =
+    Array.from({ length: selectedCandidates.length })
+  let nextIndex = 0
+  let completedCount = 0
+
+  async function fetchNextCandidate(): Promise<void> {
+    while (nextIndex < selectedCandidates.length) {
+      const index = nextIndex
+      nextIndex += 1
+      const candidate = selectedCandidates[index]
+      if (candidate === undefined) continue
+
+      try {
+        results[index] = { image: await fetchImageBlob(candidate, dependencies) }
+      } catch (error) {
+        results[index] = {
+          error:
+            error instanceof ImageBlobFetchError
+              ? error
+              : new ImageBlobFetchError('network', '画像の取得中にエラーが発生しました。', {
+                  candidateId: candidate.id,
+                  imageUrl: candidate.imageUrl,
+                }),
+        }
+      }
+      completedCount += 1
+      dependencies.onProgress?.({
+        completedCount,
+        totalCount: selectedCandidates.length,
       })
     }
   }
 
-  const images = results.flatMap((result) => ('image' in result ? [result.image] : []))
-  const failures = results.flatMap((result) => ('error' in result ? [result.error] : []))
+  const workerCount = Math.min(MAX_CONCURRENT_IMAGE_FETCHES, selectedCandidates.length)
+  await Promise.all(Array.from({ length: workerCount }, fetchNextCandidate))
+
+  const images = results.flatMap((result) =>
+    result !== undefined && 'image' in result ? [result.image] : [],
+  )
+  const failures = results.flatMap((result) =>
+    result !== undefined && 'error' in result ? [result.error] : [],
+  )
 
   if (failures.length === 0) {
     return { status: 'success', images, failures: [] }
@@ -206,7 +236,16 @@ export function createSelectedImageBlobFetcher(
   return async (candidates) => {
     const selectedCandidates = candidates.filter(({ isSelected }) => isSelected)
     const uncachedCandidates = selectedCandidates.filter(({ id }) => !fetchedImages.has(id))
-    const result = await fetchSelectedImageBlobs(uncachedCandidates, dependencies)
+    const cachedCount = selectedCandidates.length - uncachedCandidates.length
+    const result = await fetchSelectedImageBlobs(uncachedCandidates, {
+      ...dependencies,
+      onProgress: (progress) => {
+        dependencies.onProgress?.({
+          completedCount: cachedCount + progress.completedCount,
+          totalCount: selectedCandidates.length,
+        })
+      },
+    })
     for (const image of result.images) {
       fetchedImages.set(image.candidateId, image)
     }

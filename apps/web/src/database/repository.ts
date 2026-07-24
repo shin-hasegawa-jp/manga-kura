@@ -32,6 +32,7 @@ export interface StorageUsageRepository {
 
 export interface EntityRepository<T extends { id: string } = { id: string }> {
   save(input: unknown): Promise<string>
+  saveMany(inputs: readonly unknown[]): Promise<string | undefined>
   findById(id: string): Promise<T | undefined>
   findAll(): Promise<T[]>
 }
@@ -96,6 +97,10 @@ function createEntityRepository<T extends { id: string }>(
     async save(input: unknown) {
       const entity = validate(input)
       return table.put(entity)
+    },
+    async saveMany(inputs: readonly unknown[]) {
+      if (inputs.length === 0) return undefined
+      return table.bulkPut(inputs.map(validate))
     },
     findById(id: string) {
       return table.get(id)
