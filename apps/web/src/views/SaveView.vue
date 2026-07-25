@@ -1896,7 +1896,10 @@ h2 {
   gap: var(--app-space-xs);
   width: 100%;
   max-width: 24rem;
+  max-height: calc(100dvh - var(--app-space-md) - var(--app-space-md));
   padding: var(--app-space-lg) var(--app-space-md);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   text-align: center;
   background: var(--app-color-surface);
   border-radius: var(--app-radius-lg);
