@@ -5,6 +5,7 @@ const titleSchema = v.pipe(v.string(), v.minLength(1))
 const nonNegativeIntegerSchema = v.pipe(v.number(), v.integer(), v.minValue(0))
 const positiveIntegerSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
 const urlSchema = v.pipe(v.string(), v.url())
+const sha256Schema = v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/))
 
 export const LIBRARY_SORT_ORDERS = [
   'recentlyRead',
@@ -51,6 +52,7 @@ export const comicImageSchema = v.object({
   displayOrder: nonNegativeIntegerSchema,
   blob: v.blob(),
   sourceUrl: urlSchema,
+  contentHash: v.optional(sha256Schema),
   mimeType: v.pipe(v.string(), v.minLength(1)),
   fileSize: nonNegativeIntegerSchema,
   width: positiveIntegerSchema,
