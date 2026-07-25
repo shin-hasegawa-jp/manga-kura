@@ -91,4 +91,32 @@ describe('重複画像検出', () => {
     )
     expect(result.matches).toHaveLength(3)
   })
+
+  it('100画像を逐次処理して一括Blob展開を避ける', async () => {
+    const images = Array.from({ length: 100 }, (_, index) =>
+      image(`https://example.com/${index}.png`, `image-${index}`),
+    )
+    let yieldedCount = 0
+    const startedAt = performance.now()
+
+    const result = await detectImageDuplicates(images, {
+      async *savedImages() {
+        for (let index = 0; index < 100; index += 1) {
+          yieldedCount += 1
+          yield {
+            image: savedImage(
+              `saved-${index}`,
+              `https://example.com/saved-${index}.png`,
+              `saved-${index}`,
+            ),
+            episode,
+          }
+        }
+      },
+    })
+
+    expect(result.matches).toEqual([])
+    expect(yieldedCount).toBe(100)
+    expect(performance.now() - startedAt).toBeLessThan(2_000)
+  })
 })
