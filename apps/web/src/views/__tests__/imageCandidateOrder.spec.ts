@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import {
   moveSelectedCandidate,
+  orderImageCandidatesForSaving,
   orderSelectedImageCandidates,
   reconcileSelectedCandidateOrder,
 } from '../imageCandidateOrder'
@@ -52,8 +53,19 @@ describe('選択画像の保存順', () => {
     expect(
       reconcileSelectedCandidateOrder([candidate('1'), candidate('2', false)], afterClear),
     ).toEqual(['1'])
-    expect(
-      reconcileSelectedCandidateOrder([candidate('1'), candidate('2')], ['1']),
-    ).toEqual(['1', '2'])
+    expect(reconcileSelectedCandidateOrder([candidate('1'), candidate('2')], ['1'])).toEqual([
+      '1',
+      '2',
+    ])
+  })
+
+  it('保存時だけ選択画像を調整順へ並べ、未選択候補を後ろに維持する', () => {
+    const candidates = [candidate('1'), candidate('2', false), candidate('3')]
+    expect(orderImageCandidatesForSaving(candidates, ['3', '1']).map(({ id }) => id)).toEqual([
+      '3',
+      '1',
+      '2',
+    ])
+    expect(candidates.map(({ id }) => id)).toEqual(['1', '2', '3'])
   })
 })

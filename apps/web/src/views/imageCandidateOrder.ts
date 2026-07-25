@@ -6,13 +6,9 @@ export function reconcileSelectedCandidateOrder(
   candidates: readonly ImageCandidate[],
   currentOrder: readonly string[],
 ): string[] {
-  const selectedIds = new Set(
-    candidates.filter(({ isSelected }) => isSelected).map(({ id }) => id),
-  )
+  const selectedIds = new Set(candidates.filter(({ isSelected }) => isSelected).map(({ id }) => id))
   const retained = currentOrder.filter((id) => selectedIds.delete(id))
-  const newlySelected = candidates
-    .filter(({ id }) => selectedIds.has(id))
-    .map(({ id }) => id)
+  const newlySelected = candidates.filter(({ id }) => selectedIds.has(id)).map(({ id }) => id)
   return [...retained, ...newlySelected]
 }
 
@@ -49,4 +45,13 @@ export function orderSelectedImageCandidates(
     const candidate = candidatesById.get(id)
     return candidate?.isSelected === true ? [candidate] : []
   })
+}
+
+export function orderImageCandidatesForSaving(
+  candidates: readonly ImageCandidate[],
+  selectedOrder: readonly string[],
+): ImageCandidate[] {
+  const orderedSelected = orderSelectedImageCandidates(candidates, selectedOrder)
+  const selectedIds = new Set(orderedSelected.map(({ id }) => id))
+  return [...orderedSelected, ...candidates.filter(({ id }) => !selectedIds.has(id))]
 }

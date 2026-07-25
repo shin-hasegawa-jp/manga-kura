@@ -51,6 +51,7 @@ import {
 } from './imageCandidateSelection'
 import {
   moveSelectedCandidate,
+  orderImageCandidatesForSaving,
   reconcileSelectedCandidateOrder,
   type ImageCandidateMove,
 } from './imageCandidateOrder'
@@ -383,7 +384,8 @@ async function saveCurrentRegistration(
   showRegistrationErrors.value = true
 
   const details = getCurrentRegistrationDetails()
-  const validation = validateAnalyzedPageSave(pageImageAnalysisState.value, details)
+  const orderedAnalysisState = getOrderedAnalysisState()
+  const validation = validateAnalyzedPageSave(orderedAnalysisState, details)
   if (validation.status !== 'ready') {
     saveFlowError.value =
       validation.status === 'error' ? validation.message : '登録情報を確認してください。'
@@ -416,7 +418,7 @@ async function saveCurrentRegistration(
 
   try {
     const result = await saveAnalyzedPage(
-      pageImageAnalysisState.value,
+      orderedAnalysisState,
       details,
       {
         fetchImages: fetchAnalyzedImages,
@@ -553,7 +555,20 @@ function moveCandidate(candidateId: string, move: ImageCandidateMove) {
     move,
   )
   const index = getSelectedOrderIndex(candidateId)
-  orderAnnouncement.value = `画像候補 ${candidateId} を保存順 ${index + 1}番へ移動しました。`
+  const candidate =
+    pageImageAnalysisState.value?.status === 'success'
+      ? pageImageAnalysisState.value.candidates.find(({ id }) => id === candidateId)
+      : undefined
+  orderAnnouncement.value = `画像候補 ${(candidate?.domOrder ?? index) + 1} を保存順 ${index + 1}番へ移動しました。`
+}
+
+function getOrderedAnalysisState(): PageImageAnalysisState | undefined {
+  const state = pageImageAnalysisState.value
+  if (state?.status !== 'success') return state
+  return {
+    ...state,
+    candidates: orderImageCandidatesForSaving(state.candidates, selectedCandidateOrder.value),
+  }
 }
 
 function selectRegistrationMode(mode: RegistrationMode) {
