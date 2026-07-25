@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import {
   moveSelectedCandidate,
+  orderImageCandidatesForDisplay,
   orderImageCandidatesForSaving,
   orderSelectedImageCandidates,
   reconcileSelectedCandidateOrder,
@@ -65,6 +66,16 @@ describe('選択画像の保存順', () => {
       '3',
       '1',
       '2',
+    ])
+    expect(candidates.map(({ id }) => id)).toEqual(['1', '2', '3'])
+  })
+
+  it('表示では未選択候補の位置を保ち、選択済みプレビューを調整順に入れ替える', () => {
+    const candidates = [candidate('1'), candidate('2', false), candidate('3')]
+    expect(orderImageCandidatesForDisplay(candidates, ['3', '1']).map(({ id }) => id)).toEqual([
+      '3',
+      '2',
+      '1',
     ])
     expect(candidates.map(({ id }) => id)).toEqual(['1', '2', '3'])
   })

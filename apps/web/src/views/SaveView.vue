@@ -51,6 +51,7 @@ import {
 } from './imageCandidateSelection'
 import {
   moveSelectedCandidate,
+  orderImageCandidatesForDisplay,
   orderImageCandidatesForSaving,
   reconcileSelectedCandidateOrder,
   type ImageCandidateMove,
@@ -113,6 +114,14 @@ const imageCandidateSelectionState = computed(() =>
       ? imageCandidateListState.value.candidates
       : [],
   ),
+)
+const displayedImageCandidates = computed(() =>
+  imageCandidateListState.value.kind === 'populated'
+    ? orderImageCandidatesForDisplay(
+        imageCandidateListState.value.candidates,
+        selectedCandidateOrder.value,
+      )
+    : [],
 )
 
 // 解析状態からステップ1（URL入力）内の表示を決める
@@ -856,7 +865,7 @@ function applyExistingSeriesSuggestion(seriesId: string) {
 
         <p class="visually-hidden" aria-live="polite">{{ orderAnnouncement }}</p>
         <ul class="candidate-grid">
-          <li v-for="(candidate, index) in imageCandidateListState.candidates" :key="candidate.id">
+          <li v-for="(candidate, index) in displayedImageCandidates" :key="candidate.id">
             <label
               class="candidate-card"
               :class="{

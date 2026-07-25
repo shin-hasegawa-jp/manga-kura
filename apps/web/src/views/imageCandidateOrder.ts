@@ -55,3 +55,17 @@ export function orderImageCandidatesForSaving(
   const selectedIds = new Set(orderedSelected.map(({ id }) => id))
   return [...orderedSelected, ...candidates.filter(({ id }) => !selectedIds.has(id))]
 }
+
+export function orderImageCandidatesForDisplay(
+  candidates: readonly ImageCandidate[],
+  selectedOrder: readonly string[],
+): ImageCandidate[] {
+  const orderedSelected = orderSelectedImageCandidates(candidates, selectedOrder)
+  let selectedIndex = 0
+  return candidates.map((candidate) => {
+    if (!candidate.isSelected) return candidate
+    const orderedCandidate = orderedSelected[selectedIndex]
+    selectedIndex += 1
+    return orderedCandidate ?? candidate
+  })
+}
