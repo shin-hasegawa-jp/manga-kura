@@ -390,6 +390,7 @@ describe('MangaKuraDatabase', () => {
       registration: {
         seriesTitle: '新規作品',
         title: '第1話',
+        episodeNumber: 1,
         sourcePageUrl: 'https://example.com/new-series/episodes/1',
       },
       images: [secondImage, fixture.image],
@@ -406,6 +407,7 @@ describe('MangaKuraDatabase', () => {
       id: 'episode-1',
       seriesId: 'series-1',
       title: '第1話',
+      episodeNumber: 1,
       sourcePageUrl: 'https://example.com/new-series/episodes/1',
       createdAt: registeredAt,
       updatedAt: registeredAt,
@@ -483,6 +485,7 @@ describe('MangaKuraDatabase', () => {
     const registered = await service.registerStandaloneEpisode({
       registration: {
         title: '単独の話',
+        episodeNumber: 7,
         sourcePageUrl: 'https://example.com/standalone-episodes/1',
       },
       images: [fixture.image, secondImage],
@@ -492,6 +495,7 @@ describe('MangaKuraDatabase', () => {
     expect(registered.episode).toEqual({
       id: 'standalone-episode-1',
       title: '単独の話',
+      episodeNumber: 7,
       sourcePageUrl: 'https://example.com/standalone-episodes/1',
       createdAt: registeredAt,
       updatedAt: registeredAt,
@@ -546,6 +550,7 @@ describe('MangaKuraDatabase', () => {
       registration: {
         seriesId: fixture.series.id,
         title: '第2話',
+        episodeNumber: 2,
         sourcePageUrl: 'https://example.com/development-series/episodes/2',
       },
       images: [{ ...fixture.image, id: 'development-image-2' }, secondImage],
@@ -560,6 +565,7 @@ describe('MangaKuraDatabase', () => {
       id: 'development-episode-2',
       seriesId: fixture.series.id,
       title: '第2話',
+      episodeNumber: 2,
       sourcePageUrl: 'https://example.com/development-series/episodes/2',
       createdAt: registeredAt,
       updatedAt: registeredAt,

@@ -34,7 +34,9 @@ def _create_analyzer(html: str, maximum_candidates: int = 100) -> PageAnalyzer:
 
 @pytest.mark.asyncio
 async def test_html_fetch_and_candidate_extraction_are_integrated() -> None:
-    analyzer = _create_analyzer('<img src="/1.jpg"><img data-src="/2.jpg">')
+    analyzer = _create_analyzer(
+        '<title>作品名 第1話</title><img src="/1.jpg"><img data-src="/2.jpg">'
+    )
 
     result = await analyzer.analyze("https://example.com/comic/1")
 
@@ -45,6 +47,7 @@ async def test_html_fetch_and_candidate_extraction_are_integrated() -> None:
     )
     assert all(item.proxy_token.count(".") == 1 for item in result.candidates)
     assert all(item.preview_token.count(".") == 1 for item in result.candidates)
+    assert result.page_title == "作品名 第1話"
     verifier = ProxyTokenIssuer("test-secret", 900, clock=lambda: 1000)
     claims = tuple(verifier.verify(item.proxy_token) for item in result.candidates)
     assert len({claim.batch_id for claim in claims}) == 1

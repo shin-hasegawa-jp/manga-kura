@@ -128,6 +128,9 @@ export function createComicRegistrationService(
         updatedAt: registeredAt,
         scrollPosition: 0,
         scrollProgress: 0,
+        ...(registration.episodeNumber !== undefined
+          ? { episodeNumber: registration.episodeNumber }
+          : {}),
       }
       const images = createComicImages(input.images, episode.id, registeredAt)
 
@@ -156,6 +159,9 @@ export function createComicRegistrationService(
         updatedAt: registeredAt,
         scrollPosition: 0,
         scrollProgress: 0,
+        ...(registration.episodeNumber !== undefined
+          ? { episodeNumber: registration.episodeNumber }
+          : {}),
       }
       const images = createComicImages(input.images, episode.id, registeredAt)
 
@@ -196,6 +202,9 @@ export function createComicRegistrationService(
             updatedAt: registeredAt,
             scrollPosition: 0,
             scrollProgress: 0,
+            ...(registration.episodeNumber !== undefined
+              ? { episodeNumber: registration.episodeNumber }
+              : {}),
           }
           const images = createComicImages(input.images, episode.id, registeredAt)
 

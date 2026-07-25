@@ -29,7 +29,10 @@ function createDependencies(
 ): PageImageAnalyzerDependencies {
   return {
     validateUrl: vi.fn((): PageUrlValidation => ({ status: 'valid', url: pageUrl })),
-    analyzeViaApi: vi.fn(async () => ({ candidates: [createApiCandidate()] })),
+    analyzeViaApi: vi.fn(async () => ({
+      candidates: [createApiCandidate()],
+      pageTitle: '作品名 第1話',
+    })),
     createApiCandidates: vi.fn(createApiImageCandidates),
     scoreCandidates: vi.fn((candidates: readonly ImageCandidate[]): ImageCandidate[] =>
       candidates.map((candidate) => ({
@@ -54,7 +57,7 @@ describe('ページ画像解析フロー', () => {
       analyzeViaApi: vi.fn(async (url) => {
         calls.push('api')
         expect(url).toBe(pageUrl)
-        return { candidates: [createApiCandidate()] }
+        return { candidates: [createApiCandidate()], pageTitle: '作品名 第1話' }
       }),
       createApiCandidates: vi.fn((candidates) => {
         calls.push('create')
@@ -72,6 +75,7 @@ describe('ページ画像解析フロー', () => {
     ).resolves.toEqual({
       status: 'success',
       pageUrl,
+      pageTitle: '作品名 第1話',
       candidates: [
         expect.objectContaining({
           id: 'image-candidate-0',

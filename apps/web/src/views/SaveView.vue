@@ -22,6 +22,14 @@ import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import { createProxiedImageUrl } from '@/services/acquisitionApiClient'
 import { createSelectedImageBlobFetcher } from '@/services/imageBlobClient'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
+import {
+  rankExistingSeriesSuggestions,
+  type ExistingSeriesSuggestion,
+} from '@/services/existingSeriesSuggestions'
+import {
+  createSaveMetadataSuggestions,
+  type SaveMetadataSuggestions,
+} from '@/services/saveMetadataSuggestions'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import AppIcon from '@/components/AppIcon.vue'
 import SaveStepIndicator from '@/components/SaveStepIndicator.vue'
@@ -56,6 +64,8 @@ const pageImageAnalysisState = ref<PageImageAnalysisState>()
 const isSavingAnalyzedPage = ref(false)
 const saveFlowError = ref('')
 const saveProgress = ref({ completedCount: 0, totalCount: 0 })
+const metadataSuggestions = ref<SaveMetadataSuggestions>({})
+const existingSeriesSuggestions = ref<ExistingSeriesSuggestion[]>([])
 
 function createAnalyzedImageFetcher() {
   return createSelectedImageBlobFetcher({
@@ -191,6 +201,7 @@ function goBack() {
 const {
   newSeriesTitle,
   newSeriesEpisodeTitle,
+  newSeriesEpisodeNumber,
   newSeriesSourcePageUrl,
   registerNewSeries,
   resetNewSeriesFields,
@@ -198,6 +209,7 @@ const {
 } = useNewSeriesRegistration()
 const {
   standaloneEpisodeTitle,
+  standaloneEpisodeNumber,
   standaloneEpisodeSourcePageUrl,
   registerStandaloneEpisode,
   resetStandaloneEpisodeFields,
@@ -207,6 +219,7 @@ const {
   seriesOptions,
   existingSeriesId,
   existingSeriesEpisodeTitle,
+  existingSeriesEpisodeNumber,
   existingSeriesEpisodeSourcePageUrl,
   loadSeriesOptions,
   registerExistingSeriesEpisode,
@@ -246,6 +259,43 @@ async function analyzePageUrl() {
     standaloneEpisodeSourcePageUrl.value = result.pageUrl
     existingSeriesEpisodeSourcePageUrl.value = result.pageUrl
   }
+
+  if (result.status === 'success') {
+    const suggestions = createSaveMetadataSuggestions(result.pageTitle, result.pageUrl)
+    metadataSuggestions.value = suggestions
+
+    if (newSeriesTitle.value.trim() === '' && suggestions.seriesTitle) {
+      newSeriesTitle.value = suggestions.seriesTitle
+    }
+    if (newSeriesEpisodeTitle.value.trim() === '' && suggestions.episodeTitle) {
+      newSeriesEpisodeTitle.value = suggestions.episodeTitle
+    }
+    if (standaloneEpisodeTitle.value.trim() === '' && suggestions.episodeTitle) {
+      standaloneEpisodeTitle.value = suggestions.episodeTitle
+    }
+    if (existingSeriesEpisodeTitle.value.trim() === '' && suggestions.episodeTitle) {
+      existingSeriesEpisodeTitle.value = suggestions.episodeTitle
+    }
+    if (suggestions.episodeNumber !== undefined) {
+      newSeriesEpisodeNumber.value ??= suggestions.episodeNumber
+      standaloneEpisodeNumber.value ??= suggestions.episodeNumber
+      existingSeriesEpisodeNumber.value ??= suggestions.episodeNumber
+    }
+
+    const [savedSeries, savedEpisodes] = await Promise.all([
+      repository.series.findAll(),
+      repository.episodes.findAll(),
+    ])
+    if (token !== analysisToken) {
+      return
+    }
+    existingSeriesSuggestions.value = rankExistingSeriesSuggestions(
+      savedSeries,
+      savedEpisodes,
+      suggestions.seriesTitle,
+      result.pageUrl,
+    )
+  }
 }
 
 // 解析のキャンセル・URL編集への復帰（入力したURLは保持する）
@@ -257,6 +307,8 @@ function returnToUrlInput() {
   showRegistrationErrors.value = false
   completedRegistration.value = undefined
   previewErrorIds.value = new Set()
+  metadataSuggestions.value = {}
+  existingSeriesSuggestions.value = []
 }
 
 function getCandidatePreviewUrl(candidate: ImageCandidate): string {
@@ -270,12 +322,14 @@ function getCurrentRegistrationDetails(): AnalyzedPageRegistrationDetails {
         mode: 'newSeries',
         seriesTitle: newSeriesTitle.value,
         title: newSeriesEpisodeTitle.value,
+        episodeNumber: newSeriesEpisodeNumber.value,
         sourcePageUrl: newSeriesSourcePageUrl.value,
       }
     case 'standaloneEpisode':
       return {
         mode: 'standaloneEpisode',
         title: standaloneEpisodeTitle.value,
+        episodeNumber: standaloneEpisodeNumber.value,
         sourcePageUrl: standaloneEpisodeSourcePageUrl.value,
       }
     case 'existingSeries':
@@ -283,6 +337,7 @@ function getCurrentRegistrationDetails(): AnalyzedPageRegistrationDetails {
         mode: 'existingSeries',
         seriesId: existingSeriesId.value,
         title: existingSeriesEpisodeTitle.value,
+        episodeNumber: existingSeriesEpisodeNumber.value,
         sourcePageUrl: existingSeriesEpisodeSourcePageUrl.value,
       }
   }
@@ -367,6 +422,8 @@ async function saveCurrentRegistration(options: { force?: boolean } = {}) {
     fetchAnalyzedImages = createAnalyzedImageFetcher()
     saveStage.value = 'complete'
     previewErrorIds.value = new Set()
+    metadataSuggestions.value = {}
+    existingSeriesSuggestions.value = []
     showRegistrationErrors.value = false
     resetNewSeriesFields()
     resetStandaloneEpisodeFields()
@@ -437,6 +494,52 @@ function selectRegistrationMode(mode: RegistrationMode) {
   if (mode === 'existingSeries') {
     void loadSeriesOptions()
   }
+}
+
+function applySeriesTitleSuggestion() {
+  if (metadataSuggestions.value.seriesTitle) {
+    newSeriesTitle.value = metadataSuggestions.value.seriesTitle
+  }
+}
+
+function applyEpisodeTitleSuggestion() {
+  const title = metadataSuggestions.value.episodeTitle
+  if (!title) {
+    return
+  }
+  switch (registrationMode.value) {
+    case 'newSeries':
+      newSeriesEpisodeTitle.value = title
+      break
+    case 'standaloneEpisode':
+      standaloneEpisodeTitle.value = title
+      break
+    case 'existingSeries':
+      existingSeriesEpisodeTitle.value = title
+      break
+  }
+}
+
+function applyEpisodeNumberSuggestion() {
+  const episodeNumber = metadataSuggestions.value.episodeNumber
+  if (episodeNumber === undefined) {
+    return
+  }
+  switch (registrationMode.value) {
+    case 'newSeries':
+      newSeriesEpisodeNumber.value = episodeNumber
+      break
+    case 'standaloneEpisode':
+      standaloneEpisodeNumber.value = episodeNumber
+      break
+    case 'existingSeries':
+      existingSeriesEpisodeNumber.value = episodeNumber
+      break
+  }
+}
+
+function applyExistingSeriesSuggestion(seriesId: string) {
+  existingSeriesId.value = seriesId
 }
 </script>
 
@@ -742,6 +845,49 @@ function selectRegistrationMode(mode: RegistrationMode) {
           </button>
         </div>
 
+        <aside
+          v-if="
+            metadataSuggestions.pageTitle ||
+            metadataSuggestions.seriesTitle ||
+            metadataSuggestions.episodeTitle ||
+            metadataSuggestions.episodeNumber !== undefined
+          "
+          class="metadata-suggestions"
+          aria-label="ページから推定した候補"
+        >
+          <strong>ページからの候補</strong>
+          <small v-if="metadataSuggestions.pageTitle">
+            {{ metadataSuggestions.pageTitle }}
+          </small>
+          <div class="metadata-suggestions__actions">
+            <button
+              v-if="registrationMode === 'newSeries' && metadataSuggestions.seriesTitle"
+              class="app-btn app-btn--text"
+              type="button"
+              @click="applySeriesTitleSuggestion"
+            >
+              作品名：{{ metadataSuggestions.seriesTitle }}
+            </button>
+            <button
+              v-if="metadataSuggestions.episodeTitle"
+              class="app-btn app-btn--text"
+              type="button"
+              @click="applyEpisodeTitleSuggestion"
+            >
+              話タイトル：{{ metadataSuggestions.episodeTitle }}
+            </button>
+            <button
+              v-if="metadataSuggestions.episodeNumber !== undefined"
+              class="app-btn app-btn--text"
+              type="button"
+              @click="applyEpisodeNumberSuggestion"
+            >
+              話数：第{{ metadataSuggestions.episodeNumber }}話
+            </button>
+          </div>
+          <span>候補は自由に修正できます。保存前に内容を確認してください。</span>
+        </aside>
+
         <form
           v-if="registrationMode === 'newSeries'"
           class="registration-fields"
@@ -766,6 +912,18 @@ function selectRegistrationMode(mode: RegistrationMode) {
               name="title"
               type="text"
               :aria-invalid="showRegistrationErrors && newSeriesEpisodeTitle.trim() === ''"
+            />
+          </label>
+          <label class="app-field-label">
+            <span>話数（任意）</span>
+            <input
+              v-model.number="newSeriesEpisodeNumber"
+              class="app-field"
+              name="episodeNumber"
+              type="number"
+              min="0"
+              step="1"
+              inputmode="numeric"
             />
           </label>
           <label class="app-field-label">
@@ -804,6 +962,18 @@ function selectRegistrationMode(mode: RegistrationMode) {
             />
           </label>
           <label class="app-field-label">
+            <span>話数（任意）</span>
+            <input
+              v-model.number="standaloneEpisodeNumber"
+              class="app-field"
+              name="episodeNumber"
+              type="number"
+              min="0"
+              step="1"
+              inputmode="numeric"
+            />
+          </label>
+          <label class="app-field-label">
             <span>元ページURL</span>
             <input
               v-model="standaloneEpisodeSourcePageUrl"
@@ -828,6 +998,25 @@ function selectRegistrationMode(mode: RegistrationMode) {
           aria-label="既存作品への話追加の入力項目"
           @submit.prevent="saveCurrentRegistration()"
         >
+          <div v-if="existingSeriesSuggestions.length > 0" class="series-suggestions">
+            <strong>追加先の候補</strong>
+            <button
+              v-for="suggestion in existingSeriesSuggestions"
+              :key="suggestion.series.id"
+              class="app-btn app-btn--text"
+              type="button"
+              @click="applyExistingSeriesSuggestion(suggestion.series.id)"
+            >
+              {{ suggestion.series.title }}
+              <small>
+                {{
+                  suggestion.reasons.includes('exact-title')
+                    ? '作品名が一致'
+                    : '同じサイト・URL構造'
+                }}
+              </small>
+            </button>
+          </div>
           <label class="app-field-label">
             <span>追加先作品</span>
             <select
@@ -850,6 +1039,18 @@ function selectRegistrationMode(mode: RegistrationMode) {
               name="title"
               type="text"
               :aria-invalid="showRegistrationErrors && existingSeriesEpisodeTitle.trim() === ''"
+            />
+          </label>
+          <label class="app-field-label">
+            <span>話数（任意）</span>
+            <input
+              v-model.number="existingSeriesEpisodeNumber"
+              class="app-field"
+              name="episodeNumber"
+              type="number"
+              min="0"
+              step="1"
+              inputmode="numeric"
             />
           </label>
           <label class="app-field-label">
@@ -1109,6 +1310,41 @@ h2 {
 .registration-fields {
   display: grid;
   gap: var(--app-space-xs);
+}
+
+.metadata-suggestions,
+.series-suggestions {
+  display: grid;
+  gap: var(--app-space-2xs);
+  padding: var(--app-space-xs);
+  background: var(--app-color-panel);
+  border-radius: var(--app-radius-md);
+}
+
+.metadata-suggestions small,
+.metadata-suggestions > span,
+.series-suggestions small {
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-sm);
+}
+
+.metadata-suggestions__actions {
+  display: grid;
+  justify-items: start;
+  gap: var(--app-space-3xs);
+}
+
+.metadata-suggestions .app-btn--text,
+.series-suggestions .app-btn--text {
+  justify-content: flex-start;
+  min-height: 2.75rem;
+  padding-inline: var(--app-space-2xs);
+  text-align: left;
+}
+
+.series-suggestions .app-btn--text {
+  display: grid;
+  justify-items: start;
 }
 
 .registration-required {

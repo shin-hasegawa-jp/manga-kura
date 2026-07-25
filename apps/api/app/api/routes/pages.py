@@ -36,6 +36,7 @@ async def analyze_page(
     analysis = await analyzer.analyze(str(payload.url))
     return AnalyzePageResponse(
         page_url=parse_http_url(analysis.page_url),
+        page_title=analysis.page_title,
         candidates=[
             ImageCandidateResponse(
                 id=result.candidate.id,

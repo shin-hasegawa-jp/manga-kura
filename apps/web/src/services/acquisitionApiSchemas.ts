@@ -27,6 +27,7 @@ const apiImageCandidateSchema = v.object({
 
 export const pageAnalysisResponseSchema = v.object({
   pageUrl: v.pipe(v.string(), v.url()),
+  pageTitle: v.nullable(v.pipe(v.string(), v.nonEmpty(), v.maxLength(200))),
   acquisitionMethod: v.literal('api'),
   candidates: v.array(apiImageCandidateSchema),
 })

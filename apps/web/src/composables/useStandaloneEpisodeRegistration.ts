@@ -8,6 +8,7 @@ import { registrationService } from './registrationDependencies'
 
 export function useStandaloneEpisodeRegistration() {
   const standaloneEpisodeTitle = ref('')
+  const standaloneEpisodeNumber = ref<number>()
   const standaloneEpisodeSourcePageUrl = ref('')
   const standaloneEpisodeSubmission = ref<StandaloneEpisodeRegistrationSubmission>()
   const isSubmittingStandaloneEpisode = ref(false)
@@ -20,6 +21,7 @@ export function useStandaloneEpisodeRegistration() {
         registrationService,
         {
           title: standaloneEpisodeTitle.value,
+          episodeNumber: standaloneEpisodeNumber.value,
           sourcePageUrl: standaloneEpisodeSourcePageUrl.value,
         },
         images,
@@ -32,6 +34,7 @@ export function useStandaloneEpisodeRegistration() {
 
   function resetStandaloneEpisodeFields() {
     standaloneEpisodeTitle.value = ''
+    standaloneEpisodeNumber.value = undefined
     standaloneEpisodeSourcePageUrl.value = ''
   }
 
@@ -41,6 +44,7 @@ export function useStandaloneEpisodeRegistration() {
 
   return {
     standaloneEpisodeTitle,
+    standaloneEpisodeNumber,
     standaloneEpisodeSourcePageUrl,
     standaloneEpisodeSubmission,
     isSubmittingStandaloneEpisode,

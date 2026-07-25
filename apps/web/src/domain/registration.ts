@@ -3,10 +3,12 @@ import * as v from 'valibot'
 const idSchema = v.pipe(v.string(), v.minLength(1))
 const titleSchema = v.pipe(v.string(), v.minLength(1))
 const sourcePageUrlSchema = v.pipe(v.string(), v.url())
+const episodeNumberSchema = v.optional(v.pipe(v.number(), v.integer(), v.minValue(0)))
 
 const episodeRegistrationSchema = {
   title: titleSchema,
   sourcePageUrl: sourcePageUrlSchema,
+  episodeNumber: episodeNumberSchema,
 }
 
 export const createSeriesRegistrationSchema = v.object({

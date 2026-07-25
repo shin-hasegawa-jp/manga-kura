@@ -10,6 +10,7 @@ from app.services.image_candidate_extractor import (
     extract_image_candidates,
 )
 from app.services.page_html_fetcher import fetch_page_html
+from app.services.page_metadata_extractor import extract_page_title
 from app.services.proxy_token import ProxyTokenIssuer
 
 
@@ -24,6 +25,7 @@ class AnalyzedImageCandidate:
 class PageAnalysis:
     page_url: str
     candidates: tuple[AnalyzedImageCandidate, ...]
+    page_title: str | None = None
 
 
 class PageAnalyzer:
@@ -68,4 +70,5 @@ class PageAnalyzer:
                 )
                 for candidate in candidates
             ),
+            page_title=extract_page_title(fetched_html.html),
         )

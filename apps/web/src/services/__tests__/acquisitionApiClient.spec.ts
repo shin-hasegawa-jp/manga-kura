@@ -14,6 +14,7 @@ function createDependencies(fetchStub: typeof fetch): AcquisitionApiClientDepend
 function createAnalysisResponse() {
   return {
     pageUrl: 'https://example.com/comic/1',
+    pageTitle: '作品名 第1話',
     acquisitionMethod: 'api',
     candidates: [
       {
@@ -88,6 +89,8 @@ describe('取得APIクライアント', () => {
         ],
       },
     ],
+    ['ページタイトルが空', { ...createAnalysisResponse(), pageTitle: '' }],
+    ['ページタイトルが上限超過', { ...createAnalysisResponse(), pageTitle: '漫'.repeat(201) }],
   ])('ページ解析APIの不正な成功レスポンスを拒否する: %s', async (_name, payload) => {
     const fetchStub = vi.fn().mockResolvedValue(Response.json(payload))
 
