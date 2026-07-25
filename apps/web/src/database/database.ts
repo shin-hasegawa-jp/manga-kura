@@ -3,7 +3,7 @@ import type { Table } from 'dexie'
 import type { AppSettings, ComicImage, Episode, Series } from '@/domain/models'
 
 export const DATABASE_NAME = 'manga-kura'
-export const DATABASE_VERSION = 1
+export const DATABASE_VERSION = 2
 
 export const DATABASE_STORES = {
   series: '&id, title, createdAt, updatedAt, lastReadAt',
@@ -20,6 +20,7 @@ export class MangaKuraDatabase extends Dexie {
 
   constructor(name = DATABASE_NAME) {
     super(name)
+    this.version(1).stores(DATABASE_STORES)
     this.version(DATABASE_VERSION).stores(DATABASE_STORES)
     this.series = this.table<Series, string>('series')
     this.episodes = this.table<Episode, string>('episodes')

@@ -13,12 +13,20 @@ import { createMangaRepository } from './repository'
 
 export type RegistrationImage = Pick<
   ComicImage,
-  'id' | 'displayOrder' | 'blob' | 'sourceUrl' | 'mimeType' | 'fileSize' | 'width' | 'height'
+  | 'id'
+  | 'displayOrder'
+  | 'blob'
+  | 'sourceUrl'
+  | 'contentHash'
+  | 'mimeType'
+  | 'fileSize'
+  | 'width'
+  | 'height'
 >
 
 export type RegistrationImageSource = Pick<
   ComicImage,
-  'blob' | 'sourceUrl' | 'mimeType' | 'fileSize' | 'width' | 'height'
+  'blob' | 'sourceUrl' | 'contentHash' | 'mimeType' | 'fileSize' | 'width' | 'height'
 >
 
 export interface RegisterSeriesWithFirstEpisodeInput {
