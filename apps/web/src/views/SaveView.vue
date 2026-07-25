@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router'
 import {
   mdiAlertOutline,
   mdiCheck,
+  mdiChevronDown,
   mdiChevronLeft,
+  mdiChevronUp,
   mdiFileRemoveOutline,
   mdiImageSearchOutline,
   mdiLockOutline,
@@ -48,6 +50,11 @@ import {
   toggleImageCandidateSelection,
 } from './imageCandidateSelection'
 import {
+  moveSelectedCandidate,
+  reconcileSelectedCandidateOrder,
+  type ImageCandidateMove,
+} from './imageCandidateOrder'
+import {
   saveAnalyzedPage,
   validateAnalyzedPageSave,
   type AnalyzedPageRegistrationDetails,
@@ -72,6 +79,8 @@ const saveFlowError = ref('')
 const saveProgress = ref({ completedCount: 0, totalCount: 0 })
 const metadataSuggestions = ref<SaveMetadataSuggestions>({})
 const existingSeriesSuggestions = ref<ExistingSeriesSuggestion[]>([])
+const selectedCandidateOrder = ref<string[]>([])
+const orderAnnouncement = ref('')
 
 function createAnalyzedImageFetcher() {
   return createSelectedImageBlobFetcher({
@@ -267,6 +276,7 @@ async function analyzePageUrl() {
   }
 
   if (result.status === 'success') {
+    selectedCandidateOrder.value = reconcileSelectedCandidateOrder(result.candidates, [])
     const suggestions = createSaveMetadataSuggestions(result.pageTitle, result.pageUrl)
     metadataSuggestions.value = suggestions
 
@@ -315,6 +325,8 @@ function returnToUrlInput() {
   previewErrorIds.value = new Set()
   metadataSuggestions.value = {}
   existingSeriesSuggestions.value = []
+  selectedCandidateOrder.value = []
+  orderAnnouncement.value = ''
 }
 
 function getCandidatePreviewUrl(candidate: ImageCandidate): string {
@@ -501,15 +513,47 @@ function updateImageCandidates(
 }
 
 function toggleCandidate(candidateId: string) {
-  updateImageCandidates((candidates) => toggleImageCandidateSelection(candidates, candidateId))
+  updateImageCandidates((candidates) => {
+    const next = toggleImageCandidateSelection(candidates, candidateId)
+    selectedCandidateOrder.value = reconcileSelectedCandidateOrder(
+      next,
+      selectedCandidateOrder.value,
+    )
+    return next
+  })
 }
 
 function selectAllCandidates() {
-  updateImageCandidates(selectAllImageCandidates)
+  updateImageCandidates((candidates) => {
+    const next = selectAllImageCandidates(candidates)
+    selectedCandidateOrder.value = reconcileSelectedCandidateOrder(
+      next,
+      selectedCandidateOrder.value,
+    )
+    return next
+  })
 }
 
 function clearAllCandidateSelections() {
-  updateImageCandidates(clearAllImageCandidateSelections)
+  updateImageCandidates((candidates) => {
+    const next = clearAllImageCandidateSelections(candidates)
+    selectedCandidateOrder.value = []
+    return next
+  })
+}
+
+function getSelectedOrderIndex(candidateId: string): number {
+  return selectedCandidateOrder.value.indexOf(candidateId)
+}
+
+function moveCandidate(candidateId: string, move: ImageCandidateMove) {
+  selectedCandidateOrder.value = moveSelectedCandidate(
+    selectedCandidateOrder.value,
+    candidateId,
+    move,
+  )
+  const index = getSelectedOrderIndex(candidateId)
+  orderAnnouncement.value = `画像候補 ${candidateId} を保存順 ${index + 1}番へ移動しました。`
 }
 
 function selectRegistrationMode(mode: RegistrationMode) {
@@ -795,6 +839,7 @@ function applyExistingSeriesSuggestion(seriesId: string) {
           </div>
         </div>
 
+        <p class="visually-hidden" aria-live="polite">{{ orderAnnouncement }}</p>
         <ul class="candidate-grid">
           <li v-for="(candidate, index) in imageCandidateListState.candidates" :key="candidate.id">
             <label
@@ -843,6 +888,41 @@ function applyExistingSeriesSuggestion(seriesId: string) {
                 {{ candidate.isSelected ? '選択済み' : '未選択' }}
               </span>
             </label>
+            <div v-if="candidate.isSelected" class="candidate-order">
+              <span class="candidate-order__position">
+                保存順 {{ getSelectedOrderIndex(candidate.id) + 1 }}
+              </span>
+              <button
+                class="candidate-order__button"
+                type="button"
+                :disabled="getSelectedOrderIndex(candidate.id) === 0"
+                :aria-label="`画像候補 ${candidate.domOrder + 1} を保存順で1つ前へ移動`"
+                :title="
+                  getSelectedOrderIndex(candidate.id) === 0
+                    ? '先頭の画像は上へ移動できません'
+                    : '保存順を1つ前へ'
+                "
+                @click="moveCandidate(candidate.id, 'previous')"
+              >
+                <AppIcon :path="mdiChevronUp" :size="24" />
+              </button>
+              <button
+                class="candidate-order__button"
+                type="button"
+                :disabled="
+                  getSelectedOrderIndex(candidate.id) === selectedCandidateOrder.length - 1
+                "
+                :aria-label="`画像候補 ${candidate.domOrder + 1} を保存順で1つ後ろへ移動`"
+                :title="
+                  getSelectedOrderIndex(candidate.id) === selectedCandidateOrder.length - 1
+                    ? '末尾の画像は下へ移動できません'
+                    : '保存順を1つ後ろへ'
+                "
+                @click="moveCandidate(candidate.id, 'next')"
+              >
+                <AppIcon :path="mdiChevronDown" :size="24" />
+              </button>
+            </div>
           </li>
         </ul>
 
@@ -1722,6 +1802,45 @@ h2 {
   font-size: 0.6875rem;
   background: rgba(0, 0, 0, 55%);
   border-radius: var(--app-radius-sm);
+}
+
+.candidate-order {
+  display: grid;
+  grid-template-columns: 1fr 2.75rem 2.75rem;
+  align-items: center;
+  gap: var(--app-space-3xs);
+  margin-top: var(--app-space-3xs);
+}
+
+.candidate-order__position {
+  overflow: hidden;
+  color: var(--app-color-text-muted);
+  font-size: var(--app-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-order__button {
+  display: grid;
+  place-items: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  color: var(--app-color-primary);
+  background: var(--app-color-surface);
+  border: 1px solid var(--app-color-border);
+  border-radius: var(--app-radius-md);
+}
+
+.candidate-order__button:disabled {
+  color: var(--app-color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.candidate-order__button:focus-visible {
+  outline: 0.1875rem solid var(--app-color-primary);
+  outline-offset: 0.125rem;
 }
 
 .visually-hidden {
