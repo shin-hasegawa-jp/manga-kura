@@ -6,6 +6,10 @@ import {
 import { fetchSelectedImageBlobs, type ImageBlobBatchFetchResult } from '@/services/imageBlobClient'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import type { PageImageAnalysisState } from '@/services/pageImageAnalyzer'
+import type {
+  DuplicateImageMatch,
+  ImageDuplicateDetectionResult,
+} from '@/services/imageDuplicateDetector'
 
 export type AnalyzedPageRegistrationDetails =
   | {
@@ -27,6 +31,10 @@ export type AnalyzedPageRegistrationDetails =
 export type SaveAnalyzedPageResult =
   | { status: 'success' }
   | {
+      status: 'duplicate-images'
+      matches: readonly DuplicateImageMatch[]
+    }
+  | {
       status: 'error'
       kind:
         | 'url-not-analyzed'
@@ -46,6 +54,9 @@ export interface SaveAnalyzedPageDependencies {
   fetchImages(candidates: readonly ImageCandidate[]): Promise<ImageBlobBatchFetchResult>
   createImages(imageSources: readonly RegistrationImageSource[]): RegistrationImage[]
   register(images: readonly RegistrationImage[]): Promise<{ status: 'success' | 'error' }>
+  detectDuplicates?(
+    images: readonly RegistrationImageSource[],
+  ): Promise<ImageDuplicateDetectionResult>
 }
 
 function hasRegistrationDetails(details: AnalyzedPageRegistrationDetails): boolean {
@@ -105,6 +116,7 @@ export async function saveAnalyzedPage(
   details: AnalyzedPageRegistrationDetails,
   dependencies: Pick<SaveAnalyzedPageDependencies, 'register'> &
     Partial<Omit<SaveAnalyzedPageDependencies, 'register'>>,
+  options: { allowImageDuplicates?: boolean } = {},
 ): Promise<SaveAnalyzedPageResult> {
   const validation = validateAnalyzedPageSave(analysisState, details)
   if (validation.status !== 'ready') {
@@ -124,7 +136,14 @@ export async function saveAnalyzedPage(
     }
   }
 
-  const registration = await dependencies.register(createImages(fetchResult.images))
+  const duplicateResult = dependencies.detectDuplicates
+    ? await dependencies.detectDuplicates(fetchResult.images)
+    : { images: fetchResult.images, matches: [] }
+  if (duplicateResult.matches.length > 0 && !options.allowImageDuplicates) {
+    return { status: 'duplicate-images', matches: duplicateResult.matches }
+  }
+
+  const registration = await dependencies.register(createImages(duplicateResult.images))
   if (registration.status === 'error') {
     return {
       status: 'error',
