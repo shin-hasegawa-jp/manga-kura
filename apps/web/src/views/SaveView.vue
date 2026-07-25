@@ -21,6 +21,10 @@ import type { RegistrationImage } from '@/database/registrationService'
 import type { ImageCandidate } from '@/services/imageCandidateFactory'
 import { createProxiedImageUrl } from '@/services/acquisitionApiClient'
 import { createSelectedImageBlobFetcher } from '@/services/imageBlobClient'
+import {
+  createDatabaseImageDuplicateDetector,
+  type DuplicateImageMatch,
+} from '@/services/imageDuplicateDetector'
 import { analyzePageImages, type PageImageAnalysisState } from '@/services/pageImageAnalyzer'
 import {
   rankExistingSeriesSuggestions,
@@ -59,6 +63,8 @@ const offlineNotice = computed(() => getSaveOfflineNotice(isOnline.value))
 const repository = createMangaRepository(database)
 // 重複URL警告：登録済み情報を保持している間は保存を保留する
 const duplicateWarning = ref<DuplicateRegistrationView[]>()
+const duplicateImageWarning = ref<DuplicateImageMatch[]>()
+const detectDuplicateImages = createDatabaseImageDuplicateDetector(database)
 const pageUrl = ref('')
 const pageImageAnalysisState = ref<PageImageAnalysisState>()
 const isSavingAnalyzedPage = ref(false)
@@ -354,7 +360,9 @@ function registerMode(mode: RegistrationMode, images: readonly RegistrationImage
   }
 }
 
-async function saveCurrentRegistration(options: { force?: boolean } = {}) {
+async function saveCurrentRegistration(
+  options: { allowDuplicateUrl?: boolean; allowDuplicateImages?: boolean } = {},
+) {
   if (isSavingAnalyzedPage.value) {
     return
   }
@@ -371,7 +379,7 @@ async function saveCurrentRegistration(options: { force?: boolean } = {}) {
   }
 
   // 明示的に重複保存を選んでいない場合は、同一URLの既存話を警告する
-  if (!options.force) {
+  if (!options.allowDuplicateUrl) {
     const duplicates = await findDuplicateRegistrations(repository, details.sourcePageUrl.trim())
     if (duplicates.length > 0) {
       duplicateWarning.value = toDuplicateRegistrationViews(duplicates)
@@ -395,10 +403,24 @@ async function saveCurrentRegistration(options: { force?: boolean } = {}) {
   saveStage.value = 'saving'
 
   try {
-    const result = await saveAnalyzedPage(pageImageAnalysisState.value, details, {
-      fetchImages: fetchAnalyzedImages,
-      register: (images) => registerMode(details.mode, images),
-    })
+    const result = await saveAnalyzedPage(
+      pageImageAnalysisState.value,
+      details,
+      {
+        fetchImages: fetchAnalyzedImages,
+        detectDuplicates: detectDuplicateImages,
+        register: (images) => registerMode(details.mode, images),
+      },
+      {
+        allowImageDuplicates: options.allowDuplicateImages,
+      },
+    )
+
+    if (result.status === 'duplicate-images') {
+      duplicateImageWarning.value = [...result.matches]
+      saveStage.value = 'info'
+      return
+    }
 
     if (result.status === 'error') {
       const candidates =
@@ -440,7 +462,17 @@ function cancelDuplicateSave() {
 
 function confirmDuplicateSave() {
   duplicateWarning.value = undefined
-  void saveCurrentRegistration({ force: true })
+  void saveCurrentRegistration({ allowDuplicateUrl: true })
+}
+
+function cancelDuplicateImageSave() {
+  duplicateImageWarning.value = undefined
+  saveStage.value = 'image'
+}
+
+function confirmDuplicateImageSave() {
+  duplicateImageWarning.value = undefined
+  void saveCurrentRegistration({ allowDuplicateUrl: true, allowDuplicateImages: true })
 }
 
 function continueSaving() {
@@ -1125,6 +1157,63 @@ function applyExistingSeriesSuggestion(seriesId: string) {
             @click="confirmDuplicateSave"
           >
             重複して保存
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="duplicateImageWarning"
+      class="duplicate-warning"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="duplicate-image-warning-title"
+    >
+      <div class="duplicate-warning__panel">
+        <div class="duplicate-warning__icon" aria-hidden="true">
+          <AppIcon :path="mdiAlertOutline" :size="32" />
+        </div>
+        <h2 id="duplicate-image-warning-title" class="app-heading duplicate-warning__title">
+          同じ画像が見つかりました
+        </h2>
+        <p class="duplicate-warning__message">
+          {{ duplicateImageWarning.length }}件の重複候補があります。既存画像は変更されません。
+        </p>
+        <ul class="duplicate-warning__list">
+          <li
+            v-for="(match, index) in duplicateImageWarning"
+            :key="`${match.incomingIndex}-${index}`"
+          >
+            <strong>選択画像 {{ match.incomingIndex + 1 }}</strong>
+            <span v-if="match.target.kind === 'batch'">
+              今回の選択画像 {{ match.target.imageIndex + 1 }} と重複
+            </span>
+            <span v-else>
+              {{
+                match.target.seriesTitle
+                  ? `${match.target.seriesTitle} / ${match.target.episodeTitle}`
+                  : match.target.episodeTitle
+              }}（{{ match.target.imagePosition }}枚目）
+            </span>
+            <span>
+              {{ match.reasons.includes('same-content') ? '画像内容が一致' : '元画像URLが一致' }}
+            </span>
+          </li>
+        </ul>
+        <div class="duplicate-warning__actions">
+          <button
+            class="app-btn app-btn--secondary app-btn--block"
+            type="button"
+            @click="cancelDuplicateImageSave"
+          >
+            画像選択へ戻る
+          </button>
+          <button
+            class="app-btn app-btn--primary app-btn--block"
+            type="button"
+            @click="confirmDuplicateImageSave"
+          >
+            重複を含めて保存
           </button>
         </div>
       </div>

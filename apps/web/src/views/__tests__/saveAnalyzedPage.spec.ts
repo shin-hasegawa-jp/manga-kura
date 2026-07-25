@@ -202,15 +202,17 @@ describe('解析済みページの保存フロー', () => {
   it('重複画像が見つかった場合は登録前に警告結果を返す', async () => {
     const dependencies = createDependencies()
     dependencies.detectDuplicates = vi.fn(
-      async (images: readonly RegistrationImageSource[]): Promise<ImageDuplicateDetectionResult> => ({
-      images: [...images],
-      matches: [
-        {
-          incomingIndex: 0,
-          reasons: ['same-content'],
-          target: { kind: 'batch', imageIndex: 1 },
-        },
-      ],
+      async (
+        images: readonly RegistrationImageSource[],
+      ): Promise<ImageDuplicateDetectionResult> => ({
+        images: [...images],
+        matches: [
+          {
+            incomingIndex: 0,
+            reasons: ['same-content'],
+            target: { kind: 'batch', imageIndex: 1 },
+          },
+        ],
       }),
     )
 
@@ -232,15 +234,17 @@ describe('解析済みページの保存フロー', () => {
   it('重複を含める明示操作ではハッシュ付き画像を登録する', async () => {
     const dependencies = createDependencies()
     dependencies.detectDuplicates = vi.fn(
-      async (images: readonly RegistrationImageSource[]): Promise<ImageDuplicateDetectionResult> => ({
-      images: images.map((image) => ({ ...image, contentHash: 'a'.repeat(64) })),
-      matches: [
-        {
-          incomingIndex: 0,
-          reasons: ['same-content'],
-          target: { kind: 'batch', imageIndex: 1 },
-        },
-      ],
+      async (
+        images: readonly RegistrationImageSource[],
+      ): Promise<ImageDuplicateDetectionResult> => ({
+        images: images.map((image) => ({ ...image, contentHash: 'a'.repeat(64) })),
+        matches: [
+          {
+            incomingIndex: 0,
+            reasons: ['same-content'],
+            target: { kind: 'batch', imageIndex: 1 },
+          },
+        ],
       }),
     )
 
