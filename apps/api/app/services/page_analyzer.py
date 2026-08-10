@@ -1,5 +1,7 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
 from collections.abc import Callable
+from dataclasses import dataclass
 from uuid import uuid4
 
 from app.config import Settings

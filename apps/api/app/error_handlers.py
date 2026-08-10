@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import logging
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from app.errors import ApiError, ApiErrorCode, ERROR_DEFINITIONS
+from app.errors import ERROR_DEFINITIONS, ApiError, ApiErrorCode
 from app.schemas import ApiErrorDetail, ApiErrorResponse
 
 logger = logging.getLogger("manga_kura.api")

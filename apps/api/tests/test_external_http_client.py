@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 
 import httpx
@@ -19,7 +21,7 @@ class HostResolverStub:
         return self.addresses_by_hostname[hostname]
 
 
-def _settings(**overrides: float | int | str) -> Settings:
+def _settings(**overrides: float | str) -> Settings:
     return Settings().model_copy(update=overrides)
 
 

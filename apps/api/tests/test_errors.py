@@ -7,7 +7,7 @@ from pydantic import BaseModel, HttpUrl
 
 from app.application import create_app
 from app.config import Settings
-from app.errors import ApiError, ApiErrorCode, ERROR_DEFINITIONS
+from app.errors import ERROR_DEFINITIONS, ApiError, ApiErrorCode
 
 
 class UrlRequest(BaseModel):

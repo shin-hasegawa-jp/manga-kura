@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from bs4 import BeautifulSoup, Tag
 
 MAX_PAGE_TITLE_LENGTH = 200
