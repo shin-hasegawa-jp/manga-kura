@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import codecs
 import re
 from collections.abc import AsyncIterator
@@ -67,7 +69,7 @@ def _detect_encoding(body: bytes, header_encoding: str | None) -> str:
         return header_encoding
     if body.startswith(codecs.BOM_UTF8):
         return "utf-8-sig"
-    if body.startswith(codecs.BOM_UTF16_LE) or body.startswith(codecs.BOM_UTF16_BE):
+    if body.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
         return "utf-16"
 
     match = META_CHARSET_PATTERN.search(body[:META_CHARSET_SCAN_BYTES])

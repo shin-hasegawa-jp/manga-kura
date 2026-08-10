@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from app.services.image_candidate_extractor import (

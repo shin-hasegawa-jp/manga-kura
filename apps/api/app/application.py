@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,10 +10,10 @@ from app.config import Settings, get_settings
 from app.error_handlers import register_error_handlers
 from app.logging_config import configure_logging
 from app.services.external_http_client import ExternalHttpClient
-from app.services.page_analyzer import PageAnalyzer
 from app.services.image_proxy import ImageProxyService
-from app.services.rate_limiter import DomainAccessLimiter, SlidingWindowRateLimiter
+from app.services.page_analyzer import PageAnalyzer
 from app.services.proxy_usage_tracker import ProxyUsageTracker
+from app.services.rate_limiter import DomainAccessLimiter, SlidingWindowRateLimiter
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
