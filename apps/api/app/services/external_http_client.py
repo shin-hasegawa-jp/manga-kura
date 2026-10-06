@@ -87,14 +87,16 @@ class ExternalHttpClient:
         )
         try:
             async with asyncio.timeout(self._settings.total_timeout_seconds):
-                async with httpx.AsyncClient(
-                    follow_redirects=False,
-                    timeout=timeout,
-                    transport=self._transport,
-                    trust_env=False,
-                ) as client:
-                    async with self._follow_redirects(client, url) as result:
-                        yield result
+                async with (
+                    httpx.AsyncClient(
+                        follow_redirects=False,
+                        timeout=timeout,
+                        transport=self._transport,
+                        trust_env=False,
+                    ) as client,
+                    self._follow_redirects(client, url) as result,
+                ):
+                    yield result
         except ApiError:
             raise
         except (TimeoutError, httpx.TimeoutException) as error:
