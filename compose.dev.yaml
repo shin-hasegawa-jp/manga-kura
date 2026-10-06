@@ -1,4 +1,4 @@
-name: manga-kura
+name: ${COMPOSE_PROJECT_NAME:-manga-kura}
 
 services:
   api:
@@ -6,10 +6,10 @@ services:
       context: ./apps/api
       target: development
     environment:
-      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://127.0.0.1:17390,http://localhost:17390}
+      API_CORS_ORIGINS: http://127.0.0.1:${WEB_PORT:-17390},http://localhost:${WEB_PORT:-17390}
       API_PROXY_TOKEN_SECRET: ${API_PROXY_TOKEN_SECRET:?API_PROXY_TOKEN_SECRET is required}
     ports:
-      - "17391:8000"
+      - "127.0.0.1:${API_PORT:-17391}:8000"
     volumes:
       - ./apps/api:/app
       - api-venv:/app/.venv
@@ -29,9 +29,9 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile.dev
     environment:
-      VITE_FETCH_API_BASE_URL: ${VITE_FETCH_API_BASE_URL:-http://127.0.0.1:17391}
+      VITE_FETCH_API_BASE_URL: http://127.0.0.1:${API_PORT:-17391}
     ports:
-      - "17390:5173"
+      - "127.0.0.1:${WEB_PORT:-17390}:5173"
     volumes:
       - ./apps/web:/app
       - web-node-modules:/app/node_modules
