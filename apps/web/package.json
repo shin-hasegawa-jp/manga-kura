@@ -40,7 +40,7 @@
     "@vue/tsconfig": "^0.9.1",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-playwright": "^2.10.4",
+    "eslint-plugin-playwright": "^2.11.0",
     "eslint-plugin-vue": "~10.10.0",
     "fake-indexeddb": "^6.2.5",
     "jiti": "^2.7.0",
