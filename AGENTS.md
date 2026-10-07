@@ -7,3 +7,16 @@
 ## GitHub CLI
 
 - `gh`で認証・接続エラーが出た場合、再認証を依頼する前に権限付きで`gh auth status -h github.com`を再確認する。
+
+## Cloud Agent
+
+Node.js 24.15.0、uv 0.11.28、Python 3.13 は `/usr/local/bin` にある。`~/.bashrc` の末尾でこのディレクトリを PATH の先頭に置く。`node -v` が `v24.15.0` でないときは、次を実行してから npm と uv を使う。先頭にしないと `/exec-daemon/node`（v22.14）や nvm の Node 22 が先に解決され、v22.14 は `apps/web` の `engines` を満たさない。
+
+```shell
+export PATH="/usr/local/bin:$PATH"
+```
+
+- Web の依存関係は `apps/web` で `npm ci`。API の依存関係は `apps/api` で `uv sync --locked --dev`。
+- 起動時に Web（http://127.0.0.1:17390）と API（http://127.0.0.1:17391）が tmux セッション `manga-kura-web` と `manga-kura-api` で立ち上がる。ログは `/tmp/manga-kura-web.log` と `/tmp/manga-kura-api.log`。
+- `API_PROXY_TOKEN_SECRET` は起動スクリプトが `~/.manga-kura-dev.env` に書く。リポジトリには置かない。
+- 検証コマンドは `apps/web/AGENTS.md` と `apps/api/AGENTS.md` を使う。
