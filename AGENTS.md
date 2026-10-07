@@ -10,7 +10,7 @@
 
 ## Cloud Agent
 
-Node.js 24.15.0、uv 0.11.28、Python 3.13 は `/usr/local/bin` にある。`bash -l` は `/etc/profile.d/dev-toolchain-path.sh` でこのディレクトリを PATH の先頭に置く。非ログインのシェルでは `/exec-daemon/node`（v22.14）が先に解決され、`apps/web` の `engines` を満たさない。そのときは次を実行してから npm と uv を使う。
+Node.js 24.15.0、uv 0.11.28、Python 3.13 は `/usr/local/bin` にある。`~/.bashrc` の末尾でこのディレクトリを PATH の先頭に置く。`node -v` が `v24.15.0` でないときは、次を実行してから npm と uv を使う。先頭にしないと `/exec-daemon/node`（v22.14）や nvm の Node 22 が先に解決され、v22.14 は `apps/web` の `engines` を満たさない。
 
 ```shell
 export PATH="/usr/local/bin:$PATH"
