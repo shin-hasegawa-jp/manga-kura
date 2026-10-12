@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "manga-kura"
+  },
+  "targets": {
+    "manga-kura": {
+      "hosting": {
+        "prod": [
+          "manga-kura"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
