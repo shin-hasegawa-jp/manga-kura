@@ -13,12 +13,14 @@ def _claims(
     candidate_id: str,
     batch_id: str = "batch-1",
     expires_at: int = 200,
+    purpose: str = "proxy",
 ) -> ProxyTokenClaims:
     return ProxyTokenClaims(
         image_url=f"https://example.com/{candidate_id}.jpg",
         batch_id=batch_id,
         candidate_id=candidate_id,
         expires_at=expires_at,
+        purpose=purpose,
     )
 
 
@@ -64,6 +66,29 @@ async def test_expired_batch_state_is_removed() -> None:
     now = 101.0
 
     await tracker.start(_claims("candidate-1", expires_at=201))
+
+
+@pytest.mark.asyncio
+async def test_preview_and_proxy_share_one_candidate_and_byte_budget() -> None:
+    tracker = ProxyUsageTracker(1, 10, clock=lambda: 100)
+    preview = _claims("candidate-1", purpose="preview")
+    proxy = _claims("candidate-1", purpose="proxy")
+
+    await tracker.start(preview)
+    await tracker.add_bytes(preview, 6)
+    await tracker.start(proxy)
+    await tracker.add_bytes(proxy, 4)
+
+    with pytest.raises(ApiError) as count_error:
+        await tracker.start(_claims("candidate-2", purpose="preview"))
+    with pytest.raises(ApiError) as total_error:
+        await tracker.add_bytes(proxy, 1)
+    with pytest.raises(ApiError) as reuse_error:
+        await tracker.start(preview)
+
+    assert count_error.value.code is ApiErrorCode.TOO_MANY_CANDIDATES
+    assert total_error.value.code is ApiErrorCode.RESPONSE_TOO_LARGE
+    assert reuse_error.value.code is ApiErrorCode.INVALID_PROXY_TOKEN
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,8 @@ from dataclasses import dataclass
 
 from app.errors import ApiError, ApiErrorCode
 
+_PROXY_TOKEN_PURPOSES = frozenset({"preview", "proxy"})
+
 
 @dataclass(frozen=True)
 class ProxyTokenClaims:
@@ -16,6 +18,7 @@ class ProxyTokenClaims:
     batch_id: str
     candidate_id: str
     expires_at: int
+    purpose: str = "proxy"
 
 
 def _encode(value: bytes) -> str:
@@ -45,12 +48,21 @@ class ProxyTokenIssuer:
         self._ttl_seconds = ttl_seconds
         self._clock = clock
 
-    def issue(self, image_url: str, batch_id: str, candidate_id: str) -> str:
+    def issue(
+        self,
+        image_url: str,
+        batch_id: str,
+        candidate_id: str,
+        purpose: str = "proxy",
+    ) -> str:
+        if purpose not in _PROXY_TOKEN_PURPOSES:
+            raise ValueError("proxy token purpose must be preview or proxy")
         payload = json.dumps(
             {
                 "batchId": batch_id,
                 "candidateId": candidate_id,
                 "exp": int(self._clock()) + self._ttl_seconds,
+                "purpose": purpose,
                 "url": image_url,
             },
             ensure_ascii=True,
@@ -82,6 +94,7 @@ class ProxyTokenIssuer:
         batch_id = decoded_payload.get("batchId")
         candidate_id = decoded_payload.get("candidateId")
         expires_at = decoded_payload.get("exp")
+        purpose = decoded_payload.get("purpose")
         if (
             not isinstance(image_url, str)
             or not isinstance(batch_id, str)
@@ -89,6 +102,8 @@ class ProxyTokenIssuer:
             or not isinstance(candidate_id, str)
             or not candidate_id
             or not isinstance(expires_at, int)
+            or not isinstance(purpose, str)
+            or purpose not in _PROXY_TOKEN_PURPOSES
         ):
             raise ApiError(ApiErrorCode.INVALID_PROXY_TOKEN)
         if isinstance(expires_at, bool) or self._clock() >= expires_at:
@@ -98,4 +113,5 @@ class ProxyTokenIssuer:
             batch_id=batch_id,
             candidate_id=candidate_id,
             expires_at=expires_at,
+            purpose=purpose,
         )

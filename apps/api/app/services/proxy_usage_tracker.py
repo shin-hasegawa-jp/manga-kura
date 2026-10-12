@@ -11,7 +11,7 @@ from app.services.proxy_token import ProxyTokenClaims
 class _BatchUsage:
     expires_at: int
     total_bytes: int = 0
-    candidate_ids: set[str] = field(default_factory=set)
+    purposes_by_candidate: dict[str, set[str]] = field(default_factory=dict)
 
 
 class ProxyUsageTracker:
@@ -38,11 +38,17 @@ class ProxyUsageTracker:
                 claims.batch_id,
                 _BatchUsage(expires_at=claims.expires_at),
             )
-            if claims.candidate_id in usage.candidate_ids:
+            purposes = usage.purposes_by_candidate.get(claims.candidate_id)
+            if purposes is not None and claims.purpose in purposes:
                 raise ApiError(ApiErrorCode.INVALID_PROXY_TOKEN)
-            if len(usage.candidate_ids) >= self._maximum_image_count:
+            if (
+                purposes is None
+                and len(usage.purposes_by_candidate) >= self._maximum_image_count
+            ):
                 raise ApiError(ApiErrorCode.TOO_MANY_CANDIDATES)
-            usage.candidate_ids.add(claims.candidate_id)
+            usage.purposes_by_candidate.setdefault(claims.candidate_id, set()).add(
+                claims.purpose
+            )
             usage.expires_at = max(usage.expires_at, claims.expires_at)
 
     async def add_bytes(self, claims: ProxyTokenClaims, byte_size: int) -> None:
@@ -50,7 +56,12 @@ class ProxyUsageTracker:
             return
         async with self._lock:
             usage = self._batches.get(claims.batch_id)
-            if usage is None or claims.candidate_id not in usage.candidate_ids:
+            purposes = (
+                None
+                if usage is None
+                else usage.purposes_by_candidate.get(claims.candidate_id)
+            )
+            if usage is None or purposes is None or claims.purpose not in purposes:
                 raise ApiError(ApiErrorCode.INVALID_PROXY_TOKEN)
             if usage.total_bytes + byte_size > self._maximum_total_bytes:
                 raise ApiError(
