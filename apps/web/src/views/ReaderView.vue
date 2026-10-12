@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import * as v from 'valibot'
 import { mdiAlertOutline, mdiCheck, mdiChevronLeft, mdiImageOffOutline, mdiReload } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository } from '@/database/repository'
@@ -22,6 +21,7 @@ import {
   resolveReaderControlsVisibility,
 } from './readerControls'
 import { getReaderBackRoute, getReaderViewState } from './readerViewState'
+import * as v from 'valibot'
 
 const READING_POSITION_SAVE_INTERVAL_MS = 2000
 
