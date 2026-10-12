@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { mdiAlertOutline, mdiCheck, mdiChevronLeft, mdiImageOffOutline, mdiReload } from '@mdi/js'
+import { mdiAlertOutline, mdiChevronLeft, mdiImageOffOutline, mdiReload } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository } from '@/database/repository'
 import { createReadingProgressService } from '@/database/readingProgressService'
@@ -36,7 +36,6 @@ const images = ref<ComicImage[]>([])
 const imageItems = ref<ReaderImageItem[]>([])
 const failedImageIds = ref<ReadonlySet<string>>(new Set())
 const currentImage = ref(1)
-const hasReachedEnd = ref(false)
 const readerControlsVisible = ref(INITIAL_READER_CONTROLS_VISIBILITY)
 const readerState = computed(() =>
   getReaderViewState(isLoading.value, episode.value, series.value, images.value),
@@ -58,7 +57,6 @@ async function loadReader() {
   imagePresenter.dispose()
   failedImageIds.value = new Set()
   currentImage.value = 1
-  hasReachedEnd.value = false
   readerControlsVisible.value = INITIAL_READER_CONTROLS_VISIBILITY
   lastPersistedAt = undefined
 
@@ -139,9 +137,6 @@ function updateReadingPosition() {
     }
   })
   currentImage.value = elements.length === 0 ? 1 : nearestIndex + 1
-  hasReachedEnd.value =
-    elements.length > 0 &&
-    window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24
 }
 
 function persistReadingPosition(force = false) {
@@ -273,12 +268,6 @@ onBeforeUnmount(() => {
         </li>
       </ol>
 
-      <p class="visually-hidden" role="status" aria-live="polite">
-        {{
-          readerControlsVisible ? '閲覧コントロールを表示しました' : '閲覧コントロールを隠しました'
-        }}
-      </p>
-
       <Transition name="reader-controls">
         <aside v-if="readerControlsVisible" class="reader-progress" aria-live="polite">
           <span>{{ currentImage }} / {{ imageItems.length }}</span>
@@ -288,15 +277,6 @@ onBeforeUnmount(() => {
           <span>{{ progress }}%</span>
         </aside>
       </Transition>
-
-      <section v-if="hasReachedEnd" class="reader-complete" aria-labelledby="reader-complete-title">
-        <div class="reader-complete__check"><AppIcon :path="mdiCheck" :size="32" /></div>
-        <h2 id="reader-complete-title">{{ readerState.episode.title }} 読了</h2>
-        <p>最後まで読みました。</p>
-        <RouterLink class="reader-btn" :to="backRoute">
-          {{ readerState.episode.seriesId ? '作品詳細に戻る' : '本棚に戻る' }}
-        </RouterLink>
-      </section>
     </template>
   </main>
 </template>
@@ -416,7 +396,6 @@ onBeforeUnmount(() => {
   height: 100%;
   background: #fff;
 }
-.reader-complete,
 .reader-state {
   display: grid;
   justify-items: center;
@@ -425,20 +404,9 @@ onBeforeUnmount(() => {
   padding: var(--app-space-lg);
   text-align: center;
 }
-.reader-complete__check {
-  display: grid;
-  place-items: center;
-  width: 3.75rem;
-  height: 3.75rem;
-  color: #d9b48a;
-  background: rgba(217, 180, 138, 0.15);
-  border-radius: var(--app-radius-pill);
-}
-.reader-complete h2,
 .reader-state h1 {
   font-family: var(--app-font-family-serif);
 }
-.reader-complete p,
 .reader-state p {
   color: #b9b2a6;
 }
