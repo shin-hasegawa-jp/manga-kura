@@ -88,6 +88,41 @@ async def test_image_is_streamed_without_persistence() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("content_type", ["image/svg+xml", "image/bmp", "text/html"])
+async def test_content_type_outside_allowlist_is_rejected(content_type: str) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"Content-Type": content_type}, content=b"x")
+
+    service, issuer = _create_service(handler)
+
+    with pytest.raises(ApiError) as error:
+        await service.open(_issue_token(issuer, "https://example.com/image"))
+
+    assert error.value.code is ApiErrorCode.UNSUPPORTED_CONTENT_TYPE
+    assert error.value.details == {"contentType": content_type.split(";", 1)[0]}
+
+
+@pytest.mark.asyncio
+async def test_gif_content_type_is_accepted() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={
+                "Content-Type": "image/gif; charset=binary",
+                "Content-Length": "3",
+            },
+            content=b"GIF",
+        )
+
+    service, issuer = _create_service(handler)
+    image = await service.open(_issue_token(issuer, "https://example.com/image.gif"))
+    body = b"".join([chunk async for chunk in image.iter_bytes()])
+
+    assert body == b"GIF"
+    assert image.media_type == "image/gif"
+
+
+@pytest.mark.asyncio
 async def test_non_image_content_type_is_rejected() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

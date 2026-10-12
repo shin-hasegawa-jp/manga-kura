@@ -12,10 +12,19 @@ from app.services.external_http_client import ExternalHttpClient
 from app.services.proxy_token import ProxyTokenClaims, ProxyTokenIssuer
 from app.services.proxy_usage_tracker import ProxyUsageTracker
 
+_ALLOWED_IMAGE_MEDIA_TYPES = frozenset(
+    {
+        "image/gif",
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+    }
+)
+
 
 def _get_image_media_type(content_type: str) -> str:
     media_type = content_type.split(";", 1)[0].strip().lower()
-    if not media_type.startswith("image/"):
+    if media_type not in _ALLOWED_IMAGE_MEDIA_TYPES:
         raise ApiError(
             ApiErrorCode.UNSUPPORTED_CONTENT_TYPE,
             {"contentType": media_type},
