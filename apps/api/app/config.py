@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     proxy_token_secret: SecretStr = SecretStr("local-development-only-change-me")
     rate_limit_requests: int = Field(default=30, gt=0)
     rate_limit_window_seconds: float = Field(default=60, gt=0)
+    proxy_client_rate_limit_requests: int = Field(default=500, gt=0)
+    proxy_global_rate_limit_requests: int = Field(default=1000, gt=0)
+    proxy_client_rate_limit_bytes: int = Field(default=419430400, gt=0)
+    proxy_global_rate_limit_bytes: int = Field(default=838860800, gt=0)
+    proxy_rate_limit_window_seconds: float = Field(default=60, gt=0)
     domain_interval_seconds: float = Field(default=1, ge=0)
 
     @property

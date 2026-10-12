@@ -13,7 +13,11 @@ from app.services.external_http_client import ExternalHttpClient
 from app.services.image_proxy import ImageProxyService
 from app.services.page_analyzer import PageAnalyzer
 from app.services.proxy_usage_tracker import ProxyUsageTracker
-from app.services.rate_limiter import DomainAccessLimiter, SlidingWindowRateLimiter
+from app.services.rate_limiter import (
+    DomainAccessLimiter,
+    SlidingWindowByteLimiter,
+    SlidingWindowRateLimiter,
+)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -44,10 +48,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         resolved_settings.max_image_count,
         resolved_settings.max_total_image_bytes,
     )
+    application.state.proxy_client_rate_limiter = SlidingWindowRateLimiter(
+        resolved_settings.proxy_client_rate_limit_requests,
+        resolved_settings.proxy_rate_limit_window_seconds,
+        limit="requests",
+    )
+    application.state.proxy_global_rate_limiter = SlidingWindowRateLimiter(
+        resolved_settings.proxy_global_rate_limit_requests,
+        resolved_settings.proxy_rate_limit_window_seconds,
+        scope="global",
+        limit="requests",
+    )
     application.state.image_proxy_service = ImageProxyService(
         resolved_settings,
         external_http_client,
         usage_tracker=proxy_usage_tracker,
+        client_byte_limiter=SlidingWindowByteLimiter(
+            resolved_settings.proxy_client_rate_limit_bytes,
+            resolved_settings.proxy_rate_limit_window_seconds,
+        ),
+        global_byte_limiter=SlidingWindowByteLimiter(
+            resolved_settings.proxy_global_rate_limit_bytes,
+            resolved_settings.proxy_rate_limit_window_seconds,
+            scope="global",
+        ),
     )
     application.state.analyze_rate_limiter = SlidingWindowRateLimiter(
         resolved_settings.rate_limit_requests,

@@ -11,6 +11,7 @@ from app.errors import ApiError, ApiErrorCode
 from app.services.external_http_client import ExternalHttpClient
 from app.services.proxy_token import ProxyTokenClaims, ProxyTokenIssuer
 from app.services.proxy_usage_tracker import ProxyUsageTracker
+from app.services.rate_limiter import GLOBAL_RATE_LIMIT_KEY, SlidingWindowByteLimiter
 
 
 def _get_image_media_type(content_type: str) -> str:
@@ -52,6 +53,9 @@ class ImageProxyStream:
     _maximum_bytes: int
     _claims: ProxyTokenClaims
     _usage_tracker: ProxyUsageTracker
+    _client_key: str
+    _client_byte_limiter: SlidingWindowByteLimiter
+    _global_byte_limiter: SlidingWindowByteLimiter
 
     async def iter_bytes(self) -> AsyncIterator[bytes]:
         byte_size = 0
@@ -65,10 +69,7 @@ class ImageProxyStream:
                         {"resource": "image"},
                     )
                 if byte_size > accounted_bytes:
-                    await self._usage_tracker.add_bytes(
-                        self._claims,
-                        byte_size - accounted_bytes,
-                    )
+                    await self._account_bytes(byte_size - accounted_bytes)
                     accounted_bytes = byte_size
                 yield chunk
         except ApiError:
@@ -80,6 +81,11 @@ class ImageProxyStream:
         finally:
             await self._exit_stack.aclose()
 
+    async def _account_bytes(self, byte_size: int) -> None:
+        await self._client_byte_limiter.add(self._client_key, byte_size)
+        await self._global_byte_limiter.add(GLOBAL_RATE_LIMIT_KEY, byte_size)
+        await self._usage_tracker.add_bytes(self._claims, byte_size)
+
 
 class ImageProxyService:
     def __init__(
@@ -88,6 +94,8 @@ class ImageProxyService:
         http_client: ExternalHttpClient | None = None,
         token_issuer: ProxyTokenIssuer | None = None,
         usage_tracker: ProxyUsageTracker | None = None,
+        client_byte_limiter: SlidingWindowByteLimiter | None = None,
+        global_byte_limiter: SlidingWindowByteLimiter | None = None,
     ) -> None:
         self._settings = settings
         self._http_client = http_client or ExternalHttpClient(settings)
@@ -99,8 +107,17 @@ class ImageProxyService:
             settings.max_image_count,
             settings.max_total_image_bytes,
         )
+        self._client_byte_limiter = client_byte_limiter or SlidingWindowByteLimiter(
+            settings.proxy_client_rate_limit_bytes,
+            settings.proxy_rate_limit_window_seconds,
+        )
+        self._global_byte_limiter = global_byte_limiter or SlidingWindowByteLimiter(
+            settings.proxy_global_rate_limit_bytes,
+            settings.proxy_rate_limit_window_seconds,
+            scope="global",
+        )
 
-    async def open(self, token: str) -> ImageProxyStream:
+    async def open(self, token: str, client_key: str = "unknown") -> ImageProxyStream:
         claims = self._token_issuer.verify(token)
         await self._usage_tracker.start(claims)
         exit_stack = AsyncExitStack()
@@ -115,6 +132,10 @@ class ImageProxyService:
                 result.response.headers.get("content-length"),
                 self._settings.max_image_bytes,
             )
+            await self._client_byte_limiter.add(client_key, content_length or 0)
+            await self._global_byte_limiter.add(
+                GLOBAL_RATE_LIMIT_KEY, content_length or 0
+            )
             await self._usage_tracker.add_bytes(claims, content_length or 0)
         except BaseException:
             await exit_stack.aclose()
@@ -128,4 +149,7 @@ class ImageProxyService:
             _maximum_bytes=self._settings.max_image_bytes,
             _claims=claims,
             _usage_tracker=self._usage_tracker,
+            _client_key=client_key,
+            _client_byte_limiter=self._client_byte_limiter,
+            _global_byte_limiter=self._global_byte_limiter,
         )

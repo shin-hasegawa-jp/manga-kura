@@ -203,3 +203,91 @@ async def test_total_image_size_is_enforced_across_candidates() -> None:
 
     assert error.value.code is ApiErrorCode.RESPONSE_TOO_LARGE
     assert error.value.details == {"resource": "totalImages"}
+
+
+@pytest.mark.asyncio
+async def test_client_transfer_limit_rejects_additional_image() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "image/png", "Content-Length": "6"},
+            content=b"123456",
+        )
+
+    settings = Settings().model_copy(
+        update={
+            "proxy_client_rate_limit_bytes": 10,
+            "domain_interval_seconds": 0,
+        }
+    )
+    service, issuer = _create_service(handler, settings)
+    first = await service.open(
+        _issue_token(issuer, "https://first.example/image.png", "candidate-1"),
+        "203.0.113.10",
+    )
+    assert b"".join([chunk async for chunk in first.iter_bytes()]) == b"123456"
+
+    with pytest.raises(ApiError) as error:
+        await service.open(
+            _issue_token(issuer, "https://second.example/image.png", "candidate-2"),
+            "203.0.113.10",
+        )
+
+    assert error.value.code is ApiErrorCode.RATE_LIMITED
+    assert error.value.details is not None
+    assert error.value.details["scope"] == "client"
+    assert error.value.details["limit"] == "bytes"
+
+
+@pytest.mark.asyncio
+async def test_global_transfer_limit_applies_across_clients() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "image/png", "Content-Length": "6"},
+            content=b"123456",
+        )
+
+    settings = Settings().model_copy(
+        update={
+            "proxy_global_rate_limit_bytes": 10,
+            "domain_interval_seconds": 0,
+        }
+    )
+    service, issuer = _create_service(handler, settings)
+    first = await service.open(
+        _issue_token(issuer, "https://first.example/image.png", "candidate-1"),
+        "203.0.113.10",
+    )
+    assert b"".join([chunk async for chunk in first.iter_bytes()]) == b"123456"
+
+    with pytest.raises(ApiError) as error:
+        await service.open(
+            _issue_token(issuer, "https://second.example/image.png", "candidate-2"),
+            "203.0.113.11",
+        )
+
+    assert error.value.code is ApiErrorCode.RATE_LIMITED
+    assert error.value.details is not None
+    assert error.value.details["scope"] == "global"
+    assert error.value.details["limit"] == "bytes"
+
+
+@pytest.mark.asyncio
+async def test_streamed_bytes_count_toward_client_transfer_limit() -> None:
+    stream = ChunkedStream((b"123456", b"7890"))
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"Content-Type": "image/png"}, stream=stream)
+
+    settings = Settings().model_copy(
+        update={"proxy_client_rate_limit_bytes": 8, "domain_interval_seconds": 0}
+    )
+    service, issuer = _create_service(handler, settings)
+    image = await service.open(_issue_token(issuer, "https://example.com/image.png"))
+
+    with pytest.raises(ApiError) as error:
+        b"".join([chunk async for chunk in image.iter_bytes()])
+
+    assert error.value.code is ApiErrorCode.RATE_LIMITED
+    assert stream.closed is True
