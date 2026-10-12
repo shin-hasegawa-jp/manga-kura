@@ -26,10 +26,15 @@ describe('作品内の話カード表示', () => {
       {
         episodeId: fixture.episode.id,
         title: fixture.episode.title,
+        sourcePageUrl: fixture.episode.sourcePageUrl,
         episodeNumberLabel: '第1話',
         thumbnailUrl: 'blob:episode-thumbnail',
       },
-      { episodeId: unnumberedEpisode.id, title: unnumberedEpisode.title },
+      {
+        episodeId: unnumberedEpisode.id,
+        title: unnumberedEpisode.title,
+        sourcePageUrl: unnumberedEpisode.sourcePageUrl,
+      },
     ])
     expect(objectUrls.create).toHaveBeenCalledWith(fixture.image.blob)
   })

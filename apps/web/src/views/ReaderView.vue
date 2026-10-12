@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { mdiAlertOutline, mdiChevronLeft, mdiImageOffOutline, mdiReload } from '@mdi/js'
+import {
+  mdiAlertOutline,
+  mdiChevronLeft,
+  mdiImageOffOutline,
+  mdiOpenInNew,
+  mdiReload,
+} from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository } from '@/database/repository'
 import { createReadingProgressService } from '@/database/readingProgressService'
@@ -20,6 +26,7 @@ import {
   isReaderControlsToggleKey,
   resolveReaderControlsVisibility,
 } from './readerControls'
+import { getSourcePageLink } from './sourcePageLink'
 import { getReaderBackRoute, getReaderViewState } from './readerViewState'
 import * as v from 'valibot'
 
@@ -44,6 +51,7 @@ const readerState = computed(() =>
 const backRoute = computed(() =>
   episode.value ? getReaderBackRoute(episode.value) : { name: 'library' },
 )
+const sourcePageUrl = computed(() => getSourcePageLink(episode.value?.sourcePageUrl))
 const contextLabel = computed(() => series.value?.title ?? '単独の話')
 const progress = computed(() =>
   imageItems.value.length === 0
@@ -245,6 +253,17 @@ onBeforeUnmount(() => {
             <h1>{{ readerState.episode.title }}</h1>
             <p>{{ contextLabel }}</p>
           </div>
+          <a
+            v-if="sourcePageUrl"
+            class="reader-icon-btn reader-header__source"
+            :href="sourcePageUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="`${readerState.episode.title}の取得元を新しいタブで開く`"
+            title="取得元を新しいタブで開く"
+          >
+            <AppIcon :path="mdiOpenInNew" :size="24" />
+          </a>
         </header>
       </Transition>
 
@@ -335,7 +354,12 @@ onBeforeUnmount(() => {
   color: #fff;
   border-radius: var(--app-radius-pill);
 }
+.reader-header__source {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
 .reader-header__title {
+  flex: 1;
   min-width: 0;
 }
 .reader-header h1 {
