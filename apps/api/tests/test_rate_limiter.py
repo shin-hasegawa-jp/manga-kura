@@ -3,7 +3,11 @@ import asyncio
 import pytest
 
 from app.errors import ApiError, ApiErrorCode
-from app.services.rate_limiter import DomainAccessLimiter, SlidingWindowRateLimiter
+from app.services.rate_limiter import (
+    DomainAccessLimiter,
+    SlidingWindowByteLimiter,
+    SlidingWindowRateLimiter,
+)
 
 
 class ClockStub:
@@ -30,6 +34,67 @@ async def test_client_limit_allows_configured_count() -> None:
 
     assert error.value.code is ApiErrorCode.RATE_LIMITED
     assert error.value.details == {"retryAfterSeconds": 60, "scope": "client"}
+
+
+@pytest.mark.asyncio
+async def test_request_limit_reports_configured_scope() -> None:
+    clock = ClockStub()
+    limiter = SlidingWindowRateLimiter(
+        1,
+        60,
+        clock,
+        scope="global",
+        limit="requests",
+    )
+
+    await limiter.require("global")
+
+    with pytest.raises(ApiError) as error:
+        await limiter.require("global")
+
+    assert error.value.details == {
+        "retryAfterSeconds": 60,
+        "scope": "global",
+        "limit": "requests",
+    }
+
+
+@pytest.mark.asyncio
+async def test_byte_limit_rejects_when_window_total_would_exceed_maximum() -> None:
+    clock = ClockStub()
+    limiter = SlidingWindowByteLimiter(10, 60, clock)
+
+    await limiter.add("client-a", 6)
+    await limiter.add("client-b", 10)
+
+    with pytest.raises(ApiError) as error:
+        await limiter.add("client-a", 5)
+
+    assert error.value.code is ApiErrorCode.RATE_LIMITED
+    assert error.value.details == {
+        "retryAfterSeconds": 60,
+        "scope": "client",
+        "limit": "bytes",
+    }
+
+    clock.advance(60)
+    await limiter.add("client-a", 5)
+
+
+@pytest.mark.asyncio
+async def test_byte_limit_retry_after_waits_until_enough_bytes_expire() -> None:
+    clock = ClockStub()
+    limiter = SlidingWindowByteLimiter(10, 60, clock)
+
+    await limiter.add("client-a", 4)
+    clock.advance(10)
+    await limiter.add("client-a", 4)
+
+    with pytest.raises(ApiError) as error:
+        await limiter.add("client-a", 4)
+
+    assert error.value.details is not None
+    assert error.value.details["retryAfterSeconds"] == 50
 
 
 @pytest.mark.asyncio
