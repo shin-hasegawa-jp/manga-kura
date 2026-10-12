@@ -37,6 +37,11 @@ const {
   confirm: confirmDelete,
 } = useDeleteConfirm()
 const itemPresenter = createSeriesEpisodeListItemPresenter(createObjectUrlRegistry())
+const isEditingTitle = ref(false)
+const titleDraft = ref('')
+const isSavingTitle = ref(false)
+const titleError = ref('')
+const titleNotice = ref('')
 const isLoading = ref(true)
 const details = ref<SeriesDetails>()
 const episodeItems = ref<SeriesEpisodeListItem[]>([])
@@ -61,6 +66,37 @@ async function loadSeriesDetails() {
   details.value = savedDetails
   episodeItems.value = itemPresenter.present(savedDetails?.episodes ?? [])
   isLoading.value = false
+}
+
+function startEditingTitle() {
+  titleDraft.value = details.value?.series.title ?? ''
+  titleError.value = ''
+  titleNotice.value = ''
+  isEditingTitle.value = true
+}
+
+async function saveTitle() {
+  const current = details.value
+  if (current === undefined || isSavingTitle.value) return
+  const title = titleDraft.value.trim()
+  if (title.length === 0) {
+    titleError.value = '作品名を入力してください'
+    return
+  }
+
+  isSavingTitle.value = true
+  titleError.value = ''
+  try {
+    const updatedSeries = { ...current.series, title, updatedAt: new Date() }
+    await repository.series.save(updatedSeries)
+    details.value = { ...current, series: updatedSeries }
+    isEditingTitle.value = false
+    titleNotice.value = '作品名を変更しました'
+  } catch {
+    titleError.value = '作品名を保存できませんでした。もう一度お試しください。'
+  } finally {
+    isSavingTitle.value = false
+  }
 }
 
 function askDeleteSeries() {
@@ -121,6 +157,51 @@ onBeforeUnmount(() => itemPresenter.dispose())
         </div>
         <div class="series-header__meta">
           <h1 class="app-heading series-header__title">{{ details.series.title }}</h1>
+          <form v-if="isEditingTitle" class="series-title-form" @submit.prevent="saveTitle">
+            <label class="app-field-label" for="series-title">作品名</label>
+            <input
+              id="series-title"
+              v-model="titleDraft"
+              class="app-field"
+              type="text"
+              required
+              :disabled="isSavingTitle"
+              :aria-invalid="titleError.length > 0"
+              :aria-describedby="titleError ? 'series-title-error' : undefined"
+            />
+            <p
+              v-if="titleError"
+              id="series-title-error"
+              class="app-message app-message--error"
+              role="alert"
+            >
+              {{ titleError }}
+            </p>
+            <div class="series-title-form__actions">
+              <button class="app-btn app-btn--primary" type="submit" :disabled="isSavingTitle">
+                {{ isSavingTitle ? '保存中…' : '保存' }}
+              </button>
+              <button
+                class="app-btn app-btn--secondary"
+                type="button"
+                :disabled="isSavingTitle"
+                @click="isEditingTitle = false"
+              >
+                キャンセル
+              </button>
+            </div>
+          </form>
+          <button
+            v-else
+            class="app-btn app-btn--secondary"
+            type="button"
+            @click="startEditingTitle"
+          >
+            作品名を編集
+          </button>
+          <p v-if="titleNotice" class="app-message app-message--info" role="status">
+            {{ titleNotice }}
+          </p>
           <p class="series-header__count">全{{ details.episodes.length }}話</p>
           <button
             class="app-btn app-btn--danger-outline series-header__delete"
@@ -211,7 +292,19 @@ onBeforeUnmount(() => itemPresenter.dispose())
   width: 7.5rem;
 }
 
+.series-title-form {
+  display: grid;
+  gap: var(--app-space-2xs);
+}
+
+.series-title-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2xs);
+}
+
 .series-header__meta {
+  min-width: 0;
   display: grid;
   align-content: start;
   gap: var(--app-space-3xs);
