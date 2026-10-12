@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import * as v from 'valibot'
 import { mdiAlertOutline, mdiCheck, mdiChevronLeft, mdiImageOffOutline, mdiReload } from '@mdi/js'
 import { database } from '@/database/database'
 import { createMangaRepository } from '@/database/repository'
@@ -170,6 +171,22 @@ function persistReadingPosition(force = false) {
   })
 }
 
+function seekToPage(event: Event) {
+  if (!(event.target instanceof HTMLInputElement)) return
+  const result = v.safeParse(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(imageItems.value.length)),
+    event.target.valueAsNumber,
+  )
+  if (!result.success) return
+
+  const elements = document.querySelectorAll<HTMLElement>('[data-reader-image]')
+  const target = elements.item(result.output - 1)
+  if (!target) return
+  window.scrollTo({ top: window.scrollY + target.getBoundingClientRect().top, behavior: 'instant' })
+  updateReadingPosition()
+  persistReadingPosition(true)
+}
+
 function onReaderScroll() {
   updateReadingPosition()
   persistReadingPosition()
@@ -282,9 +299,18 @@ onBeforeUnmount(() => {
       <Transition name="reader-controls">
         <aside v-if="readerControlsVisible" class="reader-progress" aria-live="polite">
           <span>{{ currentImage }} / {{ imageItems.length }}</span>
-          <span class="reader-progress__track" aria-hidden="true">
-            <span :style="{ width: `${progress}%` }"></span>
-          </span>
+          <input
+            class="reader-progress__track"
+            type="range"
+            min="1"
+            :max="imageItems.length"
+            step="1"
+            :value="currentImage"
+            :disabled="imageItems.length < 2"
+            aria-label="閲覧ページ"
+            :aria-valuetext="`${currentImage} / ${imageItems.length}ページ`"
+            @input="seekToPage"
+          />
           <span>{{ progress }}%</span>
         </aside>
       </Transition>
@@ -408,8 +434,12 @@ onBeforeUnmount(() => {
 }
 .reader-progress__track {
   flex: 1;
-  height: 0.1875rem;
-  background: rgba(255, 255, 255, 0.22);
+  min-width: 0;
+  height: 2.75rem;
+  margin: 0;
+  background: transparent;
+  accent-color: #d9b48a;
+  cursor: pointer;
 }
 .reader-progress__track span {
   display: block;
@@ -451,6 +481,11 @@ onBeforeUnmount(() => {
   text-decoration: none;
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--app-radius-md);
+}
+
+.reader-progress__track:focus-visible {
+  outline: 0.1875rem solid #d9b48a;
+  outline-offset: 0.125rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
