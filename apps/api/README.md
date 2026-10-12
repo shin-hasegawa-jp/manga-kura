@@ -17,7 +17,7 @@ uv sync
 uv run fastapi dev main.py
 ```
 
-環境変数の例は`.env.example`を参照してください。`API_PROXY_TOKEN_SECRET`は環境ごとに十分長いランダム値を設定します。
+環境変数の例は`.env.example`を参照してください。`API_PROXY_TOKEN_SECRET`には、例示用ではない32文字以上のランダム値を設定します。未設定、例示用、短い値では起動しません。
 
 ## 検証
 

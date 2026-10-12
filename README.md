@@ -7,7 +7,7 @@ cp .env.example .env
 docker compose -f compose.dev.yaml up --build
 ```
 
-`.env`の`API_PROXY_TOKEN_SECRET`は起動前に変更してください。
+`.env`の`API_PROXY_TOKEN_SECRET`は、起動前に例示用ではない32文字以上のランダムな値へ変更してください。未設定、例示用、短い値ではAPIは起動しません。
 
 - Frontend: http://127.0.0.1:17390
 - API: http://127.0.0.1:17391

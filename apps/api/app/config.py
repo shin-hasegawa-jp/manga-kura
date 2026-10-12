@@ -1,7 +1,16 @@
 from functools import lru_cache
+from typing import Self
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_INSECURE_PROXY_TOKEN_SECRETS = frozenset(
+    {
+        "local-development-only-change-me",
+        "replace-with-a-long-random-secret",
+    }
+)
+_MINIMUM_PROXY_TOKEN_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -33,6 +42,18 @@ class Settings(BaseSettings):
     proxy_global_rate_limit_bytes: int = Field(default=838860800, gt=0)
     proxy_rate_limit_window_seconds: float = Field(default=60, gt=0)
     domain_interval_seconds: float = Field(default=1, ge=0)
+
+    @model_validator(mode="after")
+    def reject_insecure_proxy_token_secret(self) -> Self:
+        secret = self.proxy_token_secret.get_secret_value().strip()
+        if (
+            secret in _INSECURE_PROXY_TOKEN_SECRETS
+            or len(secret) < _MINIMUM_PROXY_TOKEN_SECRET_LENGTH
+        ):
+            raise ValueError(
+                "API_PROXY_TOKEN_SECRET には、例示用ではない32文字以上のランダムな文字列を設定してください。"
+            )
+        return self
 
     @property
     def parsed_cors_origins(self) -> tuple[str, ...]:
