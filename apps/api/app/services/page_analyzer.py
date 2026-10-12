@@ -53,7 +53,6 @@ class PageAnalyzer:
             raise ApiError(ApiErrorCode.TOO_MANY_CANDIDATES)
 
         batch_id = self._batch_id_factory()
-        preview_batch_id = self._batch_id_factory()
         return PageAnalysis(
             page_url=fetched_html.url,
             candidates=tuple(
@@ -63,11 +62,13 @@ class PageAnalyzer:
                         candidate.image_url,
                         batch_id,
                         candidate.id,
+                        "proxy",
                     ),
                     preview_token=self._token_issuer.issue(
                         candidate.image_url,
-                        preview_batch_id,
+                        batch_id,
                         candidate.id,
+                        "preview",
                     ),
                 )
                 for candidate in candidates

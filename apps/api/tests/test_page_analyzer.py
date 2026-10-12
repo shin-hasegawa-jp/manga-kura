@@ -59,7 +59,9 @@ async def test_html_fetch_and_candidate_extraction_are_integrated() -> None:
         verifier.verify(item.preview_token) for item in result.candidates
     )
     assert len({claim.batch_id for claim in preview_claims}) == 1
-    assert preview_claims[0].batch_id != claims[0].batch_id
+    assert preview_claims[0].batch_id == claims[0].batch_id
+    assert tuple(claim.purpose for claim in claims) == ("proxy", "proxy")
+    assert tuple(claim.purpose for claim in preview_claims) == ("preview", "preview")
 
 
 @pytest.mark.asyncio

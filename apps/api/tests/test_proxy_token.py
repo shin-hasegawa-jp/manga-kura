@@ -14,6 +14,32 @@ def test_issued_token_can_be_verified_before_expiration() -> None:
     assert claims.batch_id == "batch-1"
     assert claims.candidate_id == "candidate-1"
     assert claims.expires_at == 160
+    assert claims.purpose == "proxy"
+
+
+def test_preview_purpose_round_trips() -> None:
+    issuer = ProxyTokenIssuer("secret", 60, clock=lambda: 100)
+
+    token = issuer.issue(
+        "https://example.com/image.jpg",
+        "batch-1",
+        "candidate-1",
+        "preview",
+    )
+
+    assert issuer.verify(token).purpose == "preview"
+
+
+def test_unknown_purpose_is_rejected() -> None:
+    issuer = ProxyTokenIssuer("secret", 60, clock=lambda: 100)
+
+    with pytest.raises(ValueError):
+        issuer.issue(
+            "https://example.com/image.jpg",
+            "batch-1",
+            "candidate-1",
+            "thumbnail",
+        )
 
 
 @pytest.mark.parametrize("token", ["", "invalid", "a.b.c", "@@.@@"])
