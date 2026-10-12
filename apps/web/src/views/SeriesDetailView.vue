@@ -5,6 +5,7 @@ import {
   mdiAlertCircleOutline,
   mdiChevronLeft,
   mdiTextBoxOutline,
+  mdiOpenInNew,
   mdiTrashCanOutline,
 } from '@mdi/js'
 import { database } from '@/database/database'
@@ -252,6 +253,18 @@ onBeforeUnmount(() => itemPresenter.dispose())
               </p>
             </div>
           </RouterLink>
+          <a
+            v-if="item.sourcePageUrl"
+            class="episode-row__source"
+            :href="item.sourcePageUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="`${item.title}の取得元を新しいタブで開く`"
+            title="取得元を新しいタブで開く"
+          >
+            <AppIcon :path="mdiOpenInNew" :size="18" />
+            取得元
+          </a>
           <button
             class="episode-row__delete"
             type="button"
@@ -361,6 +374,29 @@ onBeforeUnmount(() => itemPresenter.dispose())
   padding: var(--app-space-xs) 0;
   color: inherit;
   text-decoration: none;
+}
+
+.episode-row__source {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: var(--app-space-3xs);
+  min-height: 2.75rem;
+  padding: 0 var(--app-space-2xs);
+  color: var(--app-color-primary);
+  font-size: var(--app-font-size-sm);
+  text-decoration: none;
+  border-radius: var(--app-radius-sm);
+}
+
+.episode-row__source:hover {
+  text-decoration: underline;
+}
+
+.episode-row__source:focus-visible {
+  outline: 0.1875rem solid currentColor;
+  outline-offset: 0.125rem;
 }
 
 .episode-row__delete {
