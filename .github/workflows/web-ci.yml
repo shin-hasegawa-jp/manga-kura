@@ -1,12 +1,17 @@
 name: Web CI
 
 on:
+  workflow_call:
   push:
     branches:
       - develop
+      - main
+      - "release/**"
   pull_request:
     branches:
       - develop
+      - main
+      - "release/**"
   workflow_dispatch:
 
 permissions:
