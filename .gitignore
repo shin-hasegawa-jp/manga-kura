@@ -23,3 +23,6 @@ firebase-debug.*.log
 /.vscode/*
 !/.vscode/tasks.json
 .idea/
+
+# Short-lived Google GitHub Actions credentials
+gha-creds-*.json

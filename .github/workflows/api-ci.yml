@@ -1,12 +1,17 @@
 name: API CI
 
 on:
+  workflow_call:
   push:
     branches:
       - develop
+      - main
+      - "release/**"
   pull_request:
     branches:
       - develop
+      - main
+      - "release/**"
   workflow_dispatch:
 
 permissions:
@@ -52,3 +57,7 @@ jobs:
 
       - name: Run unit tests
         run: uv run pytest
+
+      - name: Test production deployment orchestration (mock CLIs)
+        working-directory: .
+        run: python3 -m unittest discover -s scripts/tests -v
