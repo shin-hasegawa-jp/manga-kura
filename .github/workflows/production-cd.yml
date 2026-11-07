@@ -1,0 +1,85 @@
+name: Production CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-cd
+  cancel-in-progress: false
+
+jobs:
+  web:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/web-ci.yml
+  api:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/api-ci.yml
+  deploy:
+    needs: [web, api]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: asia-northeast1
+      SERVICE: ${{ vars.GCP_RUN_SERVICE }}
+      API_URL: ${{ vars.GCP_API_URL }}
+      WEB_URL: ${{ vars.GCP_WEB_URL }}
+      WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      DEPLOY_SA: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Validate configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in PROJECT_ID SERVICE API_URL WEB_URL WIF_PROVIDER DEPLOY_SA; do
+            if [[ -z "${!key}" ]]; then
+              echo "::error::Missing production variable: $key"
+              exit 1
+            fi
+          done
+          python3 - <<'PY'
+          import json, os
+          from urllib.parse import urlparse
+          for name in ('API_URL', 'WEB_URL'):
+              url = urlparse(os.environ[name])
+              if url.scheme != 'https' or not url.hostname or url.path not in ('', '/') or url.query or url.fragment or url.username or url.port:
+                  raise SystemExit(f'{name} must be an HTTPS origin')
+          config = json.load(open('apps/web/.firebaserc'))
+          sites = config.get('targets', {}).get(os.environ['PROJECT_ID'], {}).get('hosting', {}).get('prod', [])
+          if len(sites) != 1:
+              raise SystemExit('Expected one prod Hosting site for GCP_PROJECT_ID')
+          PY
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24.12.0
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Build web and install Firebase CLI
+        working-directory: apps/web
+        env:
+          VITE_FETCH_API_BASE_URL: ${{ env.API_URL }}
+        run: |
+          npm ci
+          npm run build
+          npm install --global firebase-tools@15.33.0
+      - name: Build runtime image
+        run: |
+          docker build --platform linux/amd64 --target runtime \
+            --tag "$REGION-docker.pkg.dev/$PROJECT_ID/manga-kura/api:$GITHUB_SHA" apps/api
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+      - name: Publish API and web
+        shell: bash
+        run: bash scripts/deploy-production.sh
